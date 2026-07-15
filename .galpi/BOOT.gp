@@ -4,12 +4,13 @@ S|0=done|1=wip|2=plan|3=exp|4=dead|5=stale|h=hot|l=lock
 A|0=skip_default|1=read_first|2=plan_only|3=verify|4=deny|5=code_check
 C|q=summary|x=deps|a=action|u=status|g=guide|e=entry|f=files|p=tests|d=domains|t=tasks|v=view
 O|R>V>F>X>G>M
-B|start:read_MAP
-B|route_hit:read_v/t/<task>.gp
+B|start:read_BOOT_and_MAP_same_call
+B|route_hit:read_.galpi/v/t/<task>.gp
+B|route_miss:infer_task_then_read_.galpi/v/t/<task>.gp;no_view_listing
 B|route_hit:no_repo_scan
 B|wip_hot:read_status_first
 B|plan:guide_only_no_code_scan
-B|dead:deny_read_reuse_modify
+B|dead:deny_read_reuse_modify;new_work_follow_replacement_link
 B|lock:deny_without_explicit_request
 B|stale_or_test_conflict:expand_scope
 D|id|state|path|key=value...

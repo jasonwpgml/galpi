@@ -5,3 +5,5 @@ F|f31|src/legacy/index.ts
 Y|y30|parseLegacyRoster|f30|t=lg.import
 L|v=v/t/lg.import.gp
 L|rule=deny_read_reuse_modify
+L|replacement=.galpi/v/d/st.gp,.galpi/status/st.gp
+L|new=read_replacement_only;deny=f30,f31
