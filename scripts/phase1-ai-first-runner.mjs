@@ -37,8 +37,8 @@ const CONDITIONS = {
   },
   C: {
     label: "AI-first Galpi",
-    branch: "phase1-ai/fixture-c",
-    commit: "1469da75f7b46e0499f3faa792cead19973c3629",
+    branch: "phase1-ai/fixture-c2",
+    commit: "e55540a6330823969e0cf82589db181e77eb0752",
     bootstrapFiles: ["AGENTS.md", ".galpi/BOOT.gp", ".galpi/MAP.gp"],
   },
 };
@@ -537,10 +537,19 @@ async function capturePatch(runDir, changed) {
   return `${trackedPatch}${untracked.join("\n")}`;
 }
 
-function allowedChange(file, scenario) {
-  return scenario.allowedPrefixes.some(
-    (prefix) => file === prefix || file.startsWith(prefix),
-  );
+function allowedChange(file, scenario, condition) {
+  if (
+    scenario.allowedPrefixes.some(
+      (prefix) => file === prefix || file.startsWith(prefix),
+    )
+  ) {
+    return true;
+  }
+  if (scenario === SCENARIOS.roster && file === "package.json") return true;
+  if (!scenario.readOnly && condition === "B" && file.startsWith(".galpi/")) {
+    return true;
+  }
+  return false;
 }
 
 function semanticEvaluation(scenarioId, finalAnswer, changed) {
@@ -548,18 +557,18 @@ function semanticEvaluation(scenarioId, finalAnswer, changed) {
   if (scenarioId === "billing") {
     const checks = {
       noImplementation:
-        /not implemented|planning[- ]only|no (?:billing )?implementation/.test(text),
+        /not implemented|planning[- ]only|no (?:billing )?implementation|구현(?:되어 있지 않|되지 않았|되지 않)|미구현/.test(text),
       evidencePath: text.includes("docs/plans/billing.md"),
       plannedScope:
         ["draft", "line item", "minor unit", "issued", "paid", "void"].filter(
           (term) => text.includes(term),
         ).length >= 3,
-      refundOrCredit: /refund|credit/.test(text),
-      invoiceNumber: /invoice[- ]number|invoice number/.test(text),
-      taxAndDiscount: text.includes("tax") && text.includes("discount"),
+      refundOrCredit: /refund|credit|환불|크레딧/.test(text),
+      invoiceNumber: /invoice[- ]number|invoice number|청구서 번호/.test(text),
+      taxAndDiscount: /tax|세금/.test(text) && /discount|할인/.test(text),
       prerequisite:
-        /\bwip\b|work[- ]in[- ]progress|in progress/.test(text) &&
-        /public api|event/.test(text),
+        /\bwip\b|work[- ]in[- ]progress|in[- ]progress|작업 중/.test(text) &&
+        /public api|event|공개 api|이벤트/.test(text),
       noChanges: changed.length === 0,
     };
     return { passed: Object.values(checks).every(Boolean), checks };
@@ -758,7 +767,9 @@ async function runOne({
   const events = parseEvents(codex.stdout);
   const trace = collectTrace(events, scenario);
   const changed = changedPaths(runDir);
-  const wrongChanges = changed.filter((file) => !allowedChange(file, scenario));
+  const wrongChanges = changed.filter(
+    (file) => !allowedChange(file, scenario, condition),
+  );
   const patch = await capturePatch(runDir, changed);
   await writeFile(path.join(patchesDir, `${runName}.patch.txt`), patch, "utf8");
   const hidden = await hiddenEvaluation(runDir, scenarioId, scenario);
@@ -973,7 +984,9 @@ async function reanalyzeExisting(outputRoot) {
     const events = parseEvents(raw);
     const trace = collectTrace(events, scenario);
     const changed = old.changedPaths.map(normalizePath);
-    const wrongChanges = changed.filter((file) => !allowedChange(file, scenario));
+    const wrongChanges = changed.filter(
+      (file) => !allowedChange(file, scenario, old.condition),
+    );
     const semantic = semanticEvaluation(old.scenario, trace.finalAnswer, changed);
     const evaluationPassed =
       old.hiddenEvaluation?.passed ?? semantic?.passed ?? false;
@@ -1017,7 +1030,9 @@ async function reanalyzeExisting(outputRoot) {
   metadata.reanalyzedAt = new Date().toISOString();
   metadata.reanalysis = [
     "accept WIP and work-in-progress as equivalent prerequisite wording",
+    "accept equivalent Korean billing-answer terminology",
     "collapse duplicate Windows path separators before route/read metrics",
+    "treat a roster test-script update and B's required Galpi synchronization as in-scope changes",
   ];
   const backupPath = path.join(outputRoot, "results.before-reanalysis.json");
   if (!existsSync(backupPath)) {

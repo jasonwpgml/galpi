@@ -8,9 +8,11 @@ Compare repository work performed by the same Codex CLI model under three condit
 | --- | --- | --- |
 | A: no Galpi | `2dc7e17579eae7ebe758752c31e6dcbce4f54a53` | no `AGENTS.md` or `.galpi/` |
 | B: human-readable Galpi | `d88113f216b99fdc0026af4b21195b9b71a4c4a9` | verbose `AGENTS.md`, YAML MAP/source, Markdown Views |
-| C: AI-first Galpi | `1469da75f7b46e0499f3faa792cead19973c3629` | two-line `AGENTS.md`, compact `.gp` boot/MAP/Views |
+| C: AI-first Galpi C2 | `e55540a6330823969e0cf82589db181e77eb0752` | two-line `AGENTS.md`, compact `.gp` boot/MAP/Views |
 
 The source tree, package files, billing plan, and seeded login defect are byte-identical across A/B/C. Roadmaps and explanatory project documents are absent from all three fixtures so the agent cannot read the experiment answer.
+
+An initial C1 run used `1469da75f7b46e0499f3faa792cead19973c3629`. It exposed one structural extra call because BOOT and MAP were read separately. C2 keeps the same grammar and data but asks for a combined BOOT+MAP read, uses an explicit task-View path, and links DEAD replacement work directly to the student domain. The final comparison uses fresh C2 runs; the C1 logs remain available as an audit trail.
 
 ## Execution controls
 
