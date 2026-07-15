@@ -1,0 +1,12 @@
+G|1|manual
+D|ls|0|src/lesson|x=stu,db|a=0
+L|t=ls.manage,ls.enroll|f=f20,f21,f22,f23,f24,f25,f26
+F|f20|src/lesson/lesson.command.enroll.ts
+F|f21|src/lesson/lesson.command.manage.ts
+F|f22|src/lesson/lesson.query.lessons.ts
+F|f23|src/lesson/lesson.repository.lesson.ts
+F|f24|src/lesson/lesson.test.enrollment.ts
+F|f25|src/lesson/lesson.types.lesson.ts
+F|f26|src/lesson/index.ts
+X|stu|d=st
+X|db|f=f40

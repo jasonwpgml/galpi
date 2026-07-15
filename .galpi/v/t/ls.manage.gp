@@ -1,0 +1,11 @@
+G|1|manual
+T|ls.manage|0|q=lesson_crud|e=y21|f=f21,f22,f23,f25,f26|x=db|p=f24|a=0
+F|f21|src/lesson/lesson.command.manage.ts
+F|f22|src/lesson/lesson.query.lessons.ts
+F|f23|src/lesson/lesson.repository.lesson.ts
+F|f24|src/lesson/lesson.test.enrollment.ts
+F|f25|src/lesson/lesson.types.lesson.ts
+F|f26|src/lesson/index.ts
+Y|y21|createLesson|f21|t=ls.manage
+X|db|f=f40
+L|v=v/t/ls.manage.gp

@@ -1,0 +1,11 @@
+G|1|manual
+T|a.login|0|q=email_password_to_session|e=y1|f=f1,f3,f4,f5|x=tok,db|p=f6|a=0
+F|f1|src/auth/auth.command.login.ts
+F|f3|src/auth/auth.repository.user.ts
+F|f4|src/auth/auth.service.password.ts
+F|f5|src/auth/auth.service.token.ts
+F|f6|src/auth/auth.test.login.ts
+Y|y1|login|f1|t=a.login
+X|tok|f=f5
+X|db|f=f40
+L|v=v/t/a.login.gp

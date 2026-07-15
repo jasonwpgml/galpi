@@ -12,9 +12,7 @@ npm run demo
 
 `npm run check`는 타입 검사, 테스트, 번들 빌드를 순서대로 실행한다. `npm run demo`는 인증, 학생 등록, 강의 생성, 수강 신청의 최소 흐름을 실행한다.
 
-## Galpi 데이터
+## Galpi AI runtime
 
-상태와 행동 규칙의 유일한 원본은 `.galpi/source.yaml`이다. `.galpi/MAP.yaml`과
-`.galpi/view/`는 Phase 0에서 수동으로 만든 탐색용 파생물이며 Phase 3부터 자동 생성한다.
-
-작업 탐색은 코드 검색보다 먼저 `.galpi/MAP.yaml`의 route와 해당 View를 따라야 한다.
+에이전트 런타임은 `.galpi/BOOT.gp`에서 시작한다. 상태·route·의도의 원본은
+`.galpi/source.gp`이며 `MAP.gp`와 `.galpi/v/`는 파생 탐색 자료다.

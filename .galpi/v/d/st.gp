@@ -1,0 +1,10 @@
+G|1|manual
+D|st|1h|src/student|x=db|a=1|u=status/st.gp
+L|t=st.create,st.list|f=f10,f11,f12,f13,f14,f15|u=status/st.gp
+F|f10|src/student/student.command.manage.ts
+F|f11|src/student/student.query.students.ts
+F|f12|src/student/student.repository.student.ts
+F|f13|src/student/student.test.crud.ts
+F|f14|src/student/student.types.student.ts
+F|f15|src/student/index.ts
+X|db|f=f40

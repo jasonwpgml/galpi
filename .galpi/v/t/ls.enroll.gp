@@ -1,0 +1,10 @@
+G|1|manual
+T|ls.enroll|0|q=enroll_student_with_capacity|e=y20|f=f20,f23,f26|x=stu,db|p=f24|a=0
+F|f20|src/lesson/lesson.command.enroll.ts
+F|f23|src/lesson/lesson.repository.lesson.ts
+F|f24|src/lesson/lesson.test.enrollment.ts
+F|f26|src/lesson/index.ts
+Y|y20|enrollStudent|f20|t=ls.enroll
+X|stu|d=st|e=y13
+X|db|f=f40
+L|v=v/t/ls.enroll.gp

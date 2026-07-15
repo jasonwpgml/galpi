@@ -1,0 +1,10 @@
+G|1|manual
+T|a.session|0|q=token_to_current_user|e=y2|f=f2,f3,f5|x=tok,db|p=f6|a=0
+F|f2|src/auth/auth.query.current-user.ts
+F|f3|src/auth/auth.repository.user.ts
+F|f5|src/auth/auth.service.token.ts
+F|f6|src/auth/auth.test.login.ts
+Y|y2|currentUser|f2|t=a.session
+X|tok|f=f5
+X|db|f=f40
+L|v=v/t/a.session.gp

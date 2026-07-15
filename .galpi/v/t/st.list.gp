@@ -1,0 +1,9 @@
+G|1|manual
+T|st.list|1h|q=list_students_sort_pending|e=y11|f=f11,f14,f15|x=db|p=f13|a=1|u=status/st.gp
+F|f11|src/student/student.query.students.ts
+F|f13|src/student/student.test.crud.ts
+F|f14|src/student/student.types.student.ts
+F|f15|src/student/index.ts
+Y|y11|listStudents|f11|t=st.list
+X|db|f=f40
+L|u=status/st.gp|v=v/t/st.list.gp

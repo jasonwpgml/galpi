@@ -1,0 +1,11 @@
+G|1|manual
+D|a|0|src/auth|x=db|a=0
+L|t=a.login,a.session|f=f1,f2,f3,f4,f5,f6,f7
+F|f1|src/auth/auth.command.login.ts
+F|f2|src/auth/auth.query.current-user.ts
+F|f3|src/auth/auth.repository.user.ts
+F|f4|src/auth/auth.service.password.ts
+F|f5|src/auth/auth.service.token.ts
+F|f6|src/auth/auth.test.login.ts
+F|f7|src/auth/index.ts
+X|db|f=f40
