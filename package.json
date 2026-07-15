@@ -1,0 +1,25 @@
+{
+  "name": "galpi-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Learning-management sample app for validating the Galpi Protocol",
+  "scripts": {
+    "build": "tsup src/main.ts --format esm --sourcemap --clean",
+    "demo": "tsx src/main.ts",
+    "start": "node dist/main.js",
+    "test": "tsx --test src/auth/auth.test.login.ts src/student/student.test.crud.ts src/lesson/lesson.test.enrollment.ts",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0",
+    "yaml": "^2.9.0"
+  }
+}

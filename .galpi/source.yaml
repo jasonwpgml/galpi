@@ -1,0 +1,146 @@
+# GALPI/1
+# Human-edited source of truth for state, intent, and routing rules.
+routes:
+  login: auth.login
+  "로그인": auth.login
+  "로그인 실패": auth.login
+  session: auth.session
+  "현재 사용자": auth.session
+  "학생 등록": student.create
+  "학생 목록": student.list
+  "학생 정렬": student.list
+  "수강 신청": lesson.enroll
+  "강의 관리": lesson.manage
+  invoice: billing.invoice
+  "청구서": billing.invoice
+  "이전 CSV 가져오기": legacy.import-roster
+  "legacy importer": legacy.import-roster
+
+domains:
+  auth:
+    state: DONE
+    summary: 이메일 로그인과 메모리 기반 세션을 제공한다.
+    path: src/auth/
+    deps: [shared.database]
+    skip: unless-touching-or-impact
+
+  student:
+    state: WIP
+    tags: [HOT]
+    summary: 학생 CRUD를 제공하며 목록 정렬 기능을 다음 작업으로 남겨 두었다.
+    path: src/student/
+    deps: [shared.database]
+    read: always
+    status: .galpi/status/student.md
+
+  lesson:
+    state: DONE
+    summary: 강의 CRUD와 학생 수강 신청을 제공한다.
+    path: src/lesson/
+    deps: [student.lookup, shared.database]
+    skip: unless-touching-or-impact
+
+  billing:
+    state: PLAN
+    summary: 학생별 청구서 생성을 위한 계획 전용 도메인이다.
+    code: none
+    guide: docs/plans/billing.md
+
+  legacy:
+    state: DEAD
+    summary: 폐기 코드 재사용 방지 실험을 위한 이전 CSV 가져오기 코드다.
+    path: src/legacy/
+    use: false
+
+  shared:
+    state: DONE
+    summary: 메모리 데이터베이스와 식별자 생성을 제공한다.
+    path: src/shared/
+    deps: []
+    read: when-dependency
+
+tasks:
+  auth.login:
+    state: DONE
+    summary: 이메일과 비밀번호를 검증하고 세션을 생성한다.
+    entrypoints: [src/auth/auth.command.login.ts#login]
+    files:
+      - src/auth/auth.command.login.ts
+      - src/auth/auth.repository.user.ts
+      - src/auth/auth.service.password.ts
+      - src/auth/auth.service.token.ts
+    dependencies: [shared.database, session.token]
+    tests: [src/auth/auth.test.login.ts]
+    rule: skip-unless-touching-or-impact
+
+  auth.session:
+    state: DONE
+    summary: 세션 토큰으로 현재 로그인 사용자를 조회한다.
+    entrypoints: [src/auth/auth.query.current-user.ts#currentUser]
+    files:
+      - src/auth/auth.query.current-user.ts
+      - src/auth/auth.service.token.ts
+    dependencies: [shared.database, session.token]
+    tests: [src/auth/auth.test.login.ts]
+    rule: skip-unless-touching-or-impact
+
+  student.create:
+    state: WIP
+    summary: 이름과 이메일을 검증해 학생을 등록한다.
+    entrypoints: [src/student/student.command.manage.ts#createStudent]
+    files:
+      - src/student/student.command.manage.ts
+      - src/student/student.repository.student.ts
+    dependencies: [shared.database]
+    tests: [src/student/student.test.crud.ts]
+    rule: read-status-first
+
+  student.list:
+    state: WIP
+    summary: 학생 목록을 반환하며 정렬 옵션은 아직 구현되지 않았다.
+    entrypoints: [src/student/student.query.students.ts#listStudents]
+    files:
+      - src/student/student.query.students.ts
+      - src/student/student.types.student.ts
+    dependencies: [shared.database]
+    tests: [src/student/student.test.crud.ts]
+    rule: read-status-first
+
+  lesson.manage:
+    state: DONE
+    summary: 강의를 생성·조회·수정·삭제한다.
+    entrypoints: [src/lesson/lesson.command.manage.ts#createLesson]
+    files:
+      - src/lesson/lesson.command.manage.ts
+      - src/lesson/lesson.query.lessons.ts
+      - src/lesson/lesson.repository.lesson.ts
+    dependencies: [shared.database]
+    tests: [src/lesson/lesson.test.enrollment.ts]
+    rule: skip-unless-touching-or-impact
+
+  lesson.enroll:
+    state: DONE
+    summary: 학생 존재 여부와 정원을 확인해 강의에 등록한다.
+    entrypoints: [src/lesson/lesson.command.enroll.ts#enrollStudent]
+    files:
+      - src/lesson/lesson.command.enroll.ts
+      - src/lesson/lesson.repository.lesson.ts
+    dependencies: [student.lookup, shared.database]
+    tests: [src/lesson/lesson.test.enrollment.ts]
+    rule: skip-unless-touching-or-impact
+
+  billing.invoice:
+    state: PLAN
+    summary: 학생과 수강 내역으로 청구서 초안을 만드는 계획이다.
+    code: none
+    guide: docs/plans/billing.md
+    rule: plan-only
+
+  legacy.import-roster:
+    state: DEAD
+    summary: 폐기된 쉼표 전용 학생 명단 가져오기 기능이다.
+    entrypoints: [src/legacy/legacy.service.csv-import.ts#parseLegacyRoster]
+    files: [src/legacy/legacy.service.csv-import.ts]
+    dependencies: []
+    tests: []
+    rule: deny-reuse-modify
