@@ -14,3 +14,12 @@ export interface UpdateStudentInput {
   name?: string;
   email?: string;
 }
+
+export type StudentSortField = "name" | "createdAt";
+
+export type StudentSortDirection = "asc" | "desc";
+
+export interface ListStudentsOptions {
+  sortBy: StudentSortField;
+  direction?: StudentSortDirection;
+}

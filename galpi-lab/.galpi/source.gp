@@ -1,14 +1,14 @@
 G|1|source
 D|a|0|src/auth|x=db|a=0
-D|st|1h|src/student|x=db|a=1|u=status/st.gp
+D|st|0|src/student|x=db|a=0
 D|ls|0|src/lesson|x=stu,db|a=0
 D|b|2|-|g=docs/plans/billing.md|a=2
 D|lg|4|src/legacy|a=4
 D|sh|0|src/shared|a=0
 T|a.login|0|q=email_password_to_session|a=0
 T|a.session|0|q=token_to_current_user|a=0
-T|st.create|1h|q=create_student|a=1|u=status/st.gp
-T|st.list|1h|q=list_students_sort_pending|a=1|u=status/st.gp
+T|st.create|0|q=create_student|a=0
+T|st.list|0|q=list_students_with_optional_sort|a=0
 T|ls.manage|0|q=lesson_crud|a=0
 T|ls.enroll|0|q=enroll_student_with_capacity|a=0
 T|b.invoice|2|q=invoice_plan|a=2|g=docs/plans/billing.md

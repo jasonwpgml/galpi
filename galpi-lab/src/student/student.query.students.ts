@@ -1,5 +1,5 @@
 import type { StudentRepository } from "./student.repository.student";
-import type { Student } from "./student.types.student";
+import type { ListStudentsOptions, Student } from "./student.types.student";
 
 export function getStudent(
   id: string,
@@ -8,6 +8,24 @@ export function getStudent(
   return students.get(id);
 }
 
-export function listStudents(students: StudentRepository): Student[] {
-  return students.list();
+// AIDEV-NOTE: calls without options must return the repository order unchanged;
+// the existing GET list API depends on that default (see .galpi/status/st.gp).
+export function listStudents(
+  students: StudentRepository,
+  options?: ListStudentsOptions,
+): Student[] {
+  const listed = students.list();
+  if (!options) {
+    return listed;
+  }
+
+  const direction = options.direction === "desc" ? -1 : 1;
+  return [...listed].sort((a, b) => {
+    const left = a[options.sortBy];
+    const right = b[options.sortBy];
+    if (left === right) {
+      return 0;
+    }
+    return left < right ? -direction : direction;
+  });
 }

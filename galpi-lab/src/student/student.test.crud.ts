@@ -19,3 +19,43 @@ test("student CRUD keeps the public module boundary", () => {
   assert.equal(students.remove(created.id), true);
   assert.equal(students.get(created.id), undefined);
 });
+
+test("student list sorting is optional and keeps the default order intact", () => {
+  const students = createStudentModule(new MemoryDatabase());
+  const cara = students.create({ name: "Cara", email: "cara@example.com" });
+  const abel = students.create({ name: "Abel", email: "abel@example.com" });
+  const bona = students.create({ name: "Bona", email: "bona@example.com" });
+
+  assert.deepEqual(
+    students.list().map((student) => student.id),
+    [cara.id, abel.id, bona.id],
+  );
+
+  assert.deepEqual(
+    students.list({ sortBy: "name" }).map((student) => student.name),
+    ["Abel", "Bona", "Cara"],
+  );
+  assert.deepEqual(
+    students
+      .list({ sortBy: "name", direction: "desc" })
+      .map((student) => student.name),
+    ["Cara", "Bona", "Abel"],
+  );
+
+  const createdAts = students.list().map((student) => student.createdAt);
+  assert.deepEqual(
+    students.list({ sortBy: "createdAt" }).map((student) => student.createdAt),
+    [...createdAts].sort(),
+  );
+  assert.deepEqual(
+    students
+      .list({ sortBy: "createdAt", direction: "desc" })
+      .map((student) => student.createdAt),
+    [...createdAts].sort().reverse(),
+  );
+
+  assert.deepEqual(
+    students.list().map((student) => student.id),
+    [cara.id, abel.id, bona.id],
+  );
+});
