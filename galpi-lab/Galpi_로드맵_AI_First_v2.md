@@ -353,14 +353,21 @@ src/
 
 ## Phase 1.5 — Codex 교차 검증 게이트 (Phase 2 진입 조건)
 
-**목적**: Phase 1의 결론(C ≥ B)이 Claude Code 전용 현상이 아님을 확인한다.
+**목적**: Phase 1의 결론(C ≥ B)이 단일 에이전트 전용 현상이 아님을 확인한다.
 이 게이트를 통과해야 compact protocol을 기반으로 CLI를 구축하는 Phase 2가 정당화된다.
+
+> **정정 메모 (2026-07-17)**: Phase 1 본 측정이 Codex CLI(gpt-5.6-sol)로 수행되었으므로
+> 이 게이트의 교차 검증 에이전트는 **Claude Code**다. 아래 체크리스트의 "Codex"는
+> "교차 에이전트(Claude Code)"로 읽는다.
 
 ### 체크리스트
 
-- [ ] Codex 환경 준비: 동일 fixture(A/B/C), 동일 시나리오 5종.
-- [ ] Codex에서 A/B/C 각 15회 실행 (Claude Phase 1과 동일 프로토콜).
-- [ ] 측정값 동일 항목 기록, 에이전트별 컬럼 분리 → `docs/experiments/phase1-codex.md`.
+- [ ] 교차 에이전트(Claude Code) 환경 준비: 동일 fixture(A/B/C), 동일 시나리오 5종.
+- [ ] 교차 에이전트에서 A/B/C 각 15회 실행 (Phase 1과 동일 프로토콜).
+- [ ] 측정값 동일 항목 기록, 에이전트별 컬럼 분리 → `docs/experiments/phase1-claude.md`.
+- [ ] 측정기에서 캐시/비캐시 입력 토큰을 분리 수집하고, 원시 합계와 함께 유효 토큰
+  `ET = m × (1.0·I_fresh + 0.1·I_cached + 4.0·O)` (GitHub Agentic Workflows 공식)를 병기.
+  Claude Code는 프롬프트 캐싱 비중이 커서 원시 합계만으로는 B/C 비교가 왜곡될 수 있다.
 - [ ] **판정**:
   - Codex에서도 C ≥ B (정확도 유지 + 비용 감소) → Phase 2 진행.
   - Codex에서 B > C → opcode 명시성 상향(C3) 후 양쪽 재측정. 그래도 갈리면
@@ -390,6 +397,12 @@ src/
 - [ ] `PLAN`에 코드가 발견되면 오류.
 - [ ] `DEAD`가 외부 import되면 오류.
 - [ ] `LOCK` 파일 수정 감지.
+- [ ] **PreToolUse 훅 게이팅**: 에이전트 래퍼(Claude Code hooks 등)에서 `.galpi` 상태 파서를
+  재사용해 DEAD(4)·LOCK(l) 경로에 대한 write/edit 도구 호출을 셸 단에서 거부.
+  상태 규약을 프롬프트 추종이 아니라 물리적으로 강제한다 (SWE-agent ACI의 린터 게이트 준용).
+- [ ] (실험 설계) 더 큰 fixture 재측정에 3개 파일 이상을 고치는 multi-file 변경 시나리오 포함.
+  구조 인덱스의 정확도 이득이 multi-file 변경에서 최대라는 외부 실증 반영
+  (`docs/plans/external-review-2026-07.md` 참조).
 - [ ] `galpi check --ai`는 compact 오류 패킷 출력.
 - [ ] `galpi check --human` 또는 `galpi explain errors`는 사람용 설명 출력.
 - [ ] pre-commit과 CI에 `galpi check` 연결.
