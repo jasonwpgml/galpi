@@ -284,6 +284,7 @@ function parseArguments(argv) {
     validateOnly: false,
     keepWorktrees: false,
     reanalyze: null,
+    retryExcluded: null,
     runId: new Date().toISOString().replaceAll(":", "-").replaceAll(".", "-"),
   };
 
@@ -308,6 +309,8 @@ function parseArguments(argv) {
       options.runId = argument.slice("--run-id=".length);
     } else if (argument.startsWith("--reanalyze=")) {
       options.reanalyze = argument.slice("--reanalyze=".length);
+    } else if (argument.startsWith("--retry-excluded=")) {
+      options.retryExcluded = argument.slice("--retry-excluded=".length);
     } else {
       throw new Error(`Unknown argument: ${argument}`);
     }
@@ -738,7 +741,14 @@ function allowedChange(file, scenario, condition) {
     return true;
   }
   if (scenario === SCENARIOS.roster && file === "package.json") return true;
-  if (!scenario.readOnly && condition === "B" && file.startsWith(".galpi/")) {
+  // AIDEV-NOTE: both Galpi conditions (B human-readable, C compact) mandate
+  // post-change state sync in .galpi/, so those edits are in-scope for B and C
+  // alike; only condition A (no Galpi) treats them as wrong changes.
+  if (
+    !scenario.readOnly &&
+    (condition === "B" || condition === "C") &&
+    file.startsWith(".galpi/")
+  ) {
     return true;
   }
   return false;
@@ -1349,7 +1359,7 @@ async function reanalyzeExisting(outputRoot) {
     "accept WIP and work-in-progress as equivalent prerequisite wording",
     "accept equivalent Korean billing-answer terminology",
     "collapse duplicate Windows path separators before route/read metrics",
-    "treat a roster test-script update and B's required Galpi synchronization as in-scope changes",
+    "treat a roster test-script update and B/C's required Galpi synchronization as in-scope changes",
     "exclude provider infrastructure failures and their paired A/B/C rows from acceptance metrics",
   ];
   const backupPath = path.join(outputRoot, "results.before-reanalysis.json");
@@ -1366,8 +1376,120 @@ async function reanalyzeExisting(outputRoot) {
   console.log(JSON.stringify(aggregate.comparison));
 }
 
+async function retryExcludedRuns(outputRoot) {
+  const resultsPath = path.join(outputRoot, "results.json");
+  const aggregatePath = path.join(outputRoot, "aggregate.json");
+  const metadataPath = path.join(outputRoot, "metadata.json");
+  const previous = JSON.parse(await readFile(resultsPath, "utf8"));
+  const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
+  const agent = metadata.agent ?? "codex";
+  await validateFixture(agent);
+  console.log("VALID fixture parity and condition structure");
+
+  // AIDEV-NOTE: an infrastructure failure poisons its whole A/B/C pair group
+  // (see aggregateResults), so retry replaces every row of the group — including
+  // siblings that succeeded — and overwrites their logs/patches under the same
+  // runName. results.before-retry.json is the only record of the replaced rows.
+  const pairKey = (row) => `${row.repeat}:${row.scenario}`;
+  const excludedPairKeys = new Set(
+    previous.filter((row) => row.infrastructureFailure).map(pairKey),
+  );
+  if (!excludedPairKeys.size) {
+    console.log("NO EXCLUDED PAIR GROUPS — nothing to retry");
+    return;
+  }
+
+  const backupPath = path.join(outputRoot, "results.before-retry.json");
+  if (!existsSync(backupPath)) {
+    await writeFile(backupPath, JSON.stringify(previous, null, 2), "utf8");
+  }
+
+  const worktreeRoot = path.join(outputRoot, "worktrees");
+  const logsDir = path.join(outputRoot, "logs");
+  const patchesDir = path.join(outputRoot, "patches");
+  await Promise.all([
+    mkdir(worktreeRoot, { recursive: true }),
+    mkdir(logsDir, { recursive: true }),
+    mkdir(patchesDir, { recursive: true }),
+  ]);
+
+  const groups = [...excludedPairKeys].sort().map((key) => {
+    const [repeat, scenarioId] = key.split(":");
+    return { repeat: Number(repeat), scenarioId };
+  });
+  const conditions = Object.keys(metadata.conditions ?? CONDITIONS);
+
+  const encoder = getEncoding("o200k_base");
+  const results = previous.filter((row) => !excludedPairKeys.has(pairKey(row)));
+  try {
+    for (const { repeat, scenarioId } of groups) {
+      const prepared = [];
+      for (const condition of conditions) {
+        const runName = `r${repeat}-${condition.toLowerCase()}-${scenarioId}`;
+        await removeWorktree(worktreeRoot, path.join(worktreeRoot, runName));
+        await rm(path.join(worktreeRoot, runName), {
+          recursive: true,
+          force: true,
+        });
+        const runDir = await prepareWorktree(
+          worktreeRoot,
+          runName,
+          CONDITIONS[condition].commit,
+        );
+        prepared.push({ condition, runDir });
+      }
+      const block = await Promise.all(
+        prepared.map(({ condition, runDir }) =>
+          runOne({
+            agent,
+            repeat,
+            condition,
+            scenarioId,
+            runDir,
+            logsDir,
+            patchesDir,
+            encoder,
+          }),
+        ),
+      );
+      results.push(...block);
+      await writeFile(
+        path.join(outputRoot, "results.partial.json"),
+        JSON.stringify(results, null, 2),
+        "utf8",
+      );
+      for (const { runDir } of prepared) {
+        await removeWorktree(worktreeRoot, runDir);
+      }
+    }
+  } finally {
+    if (typeof encoder.free === "function") encoder.free();
+  }
+
+  const aggregate = aggregateResults(results, expectedRunCount(metadata));
+  metadata.retriedAt = new Date().toISOString();
+  metadata.retriedPairGroups = [...excludedPairKeys].sort();
+  metadata.completedRuns = results.length;
+  metadata.validRuns = aggregate.validity.includedRuns;
+  metadata.excludedRuns = aggregate.validity.excludedRuns;
+  metadata.complete = aggregate.validity.complete;
+  await Promise.all([
+    writeFile(resultsPath, JSON.stringify(results, null, 2), "utf8"),
+    writeFile(aggregatePath, JSON.stringify(aggregate, null, 2), "utf8"),
+    writeFile(metadataPath, JSON.stringify(metadata, null, 2), "utf8"),
+  ]);
+  runSync("git", ["worktree", "prune"], { allowFailure: true });
+  console.log(`RETRIED groups=${groups.length} runs=${results.length}`);
+  console.log(`RESULT_ROOT=${outputRoot}`);
+  console.log(JSON.stringify(aggregate.comparison));
+}
+
 async function main() {
   const options = parseArguments(process.argv.slice(2));
+  if (options.retryExcluded) {
+    await retryExcludedRuns(path.resolve(ROOT, options.retryExcluded));
+    return;
+  }
   await validateFixture(options.agent);
   console.log("VALID fixture parity and condition structure");
   if (options.reanalyze) {
