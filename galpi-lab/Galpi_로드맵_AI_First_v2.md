@@ -362,18 +362,26 @@ src/
 
 ### 체크리스트
 
-- [ ] 교차 에이전트(Claude Code) 환경 준비: 동일 fixture(A/B/C), 동일 시나리오 5종.
-- [ ] 교차 에이전트에서 A/B/C 각 15회 실행 (Phase 1과 동일 프로토콜).
-- [ ] 측정값 동일 항목 기록, 에이전트별 컬럼 분리 → `docs/experiments/phase1-claude.md`.
-- [ ] 측정기에서 캐시/비캐시 입력 토큰을 분리 수집하고, 원시 합계와 함께 유효 토큰
+- [x] 교차 에이전트(Claude Code) 환경 준비: 동일 fixture(A/B/C), 동일 시나리오 5종.
+- [x] 교차 에이전트에서 A/B/C 각 15회 실행 (Phase 1과 동일 프로토콜).
+  (`claude-full-1`, 45/45 유효 — r3 사용량 한도 실패 12회는 `--retry-excluded`로 재실행)
+- [x] 측정값 동일 항목 기록, 에이전트별 컬럼 분리 → `docs/experiments/phase1-claude.md`.
+- [x] 측정기에서 캐시/비캐시 입력 토큰을 분리 수집하고, 원시 합계와 함께 유효 토큰
   `ET = m × (1.0·I_fresh + 0.1·I_cached + 4.0·O)` (GitHub Agentic Workflows 공식)를 병기.
   Claude Code는 프롬프트 캐싱 비중이 커서 원시 합계만으로는 B/C 비교가 왜곡될 수 있다.
-- [ ] **판정**:
+- [x] **판정**:
   - Codex에서도 C ≥ B (정확도 유지 + 비용 감소) → Phase 2 진행.
   - Codex에서 B > C → opcode 명시성 상향(C3) 후 양쪽 재측정. 그래도 갈리면
     모델별 profile 분기(Phase 5 항목)를 Phase 2 설계에 앞당겨 반영.
   - Codex에서 parse 실패 발생 → 실패 지점의 opcode/구분자를 기록하고 BOOT 문법 보강.
-- [ ] 두 에이전트 결과 비교 요약 1페이지 작성 (공개 시 "agent-agnostic" 증빙의 초석).
+- [x] 두 에이전트 결과 비교 요약 1페이지 작성 (공개 시 "agent-agnostic" 증빙의 초석).
+  (`docs/experiments/phase1-claude.md`의 "두 에이전트 비교" 섹션)
+
+> **판정 결과 (2026-07-18)**: Claude에서 C2는 토큰 -27.1%(ET -22.0%)·route +20%p·state
+> +6.7%p로 이겼지만 정확도 93.3%(<B 100%, 1회 차)와 탐색 효율(관련 없는 읽기·전체 검색·
+> 실행 시간)에서 밀려 엄격 게이트 `acceptsC: false` — **"B > C" 분기 적용: C3 opcode
+> 명시성 상향 후 양쪽 재측정. parse 실패는 0회로 `.gp` 문법 자체는 agent-agnostic 확인.**
+> Claude의 확률적 프로토콜 생략이 원인이므로 PreToolUse 훅 게이팅(Phase 2)의 근거가 보강됨.
 
 ---
 
