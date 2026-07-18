@@ -382,6 +382,8 @@ src/
 > 실행 시간)에서 밀려 엄격 게이트 `acceptsC: false` — **"B > C" 분기 적용: C3 opcode
 > 명시성 상향 후 양쪽 재측정. parse 실패는 0회로 `.gp` 문법 자체는 agent-agnostic 확인.**
 > Claude의 확률적 프로토콜 생략이 원인이므로 PreToolUse 훅 게이팅(Phase 2)의 근거가 보강됨.
+> **주의**: 사후에 45회 전부가 프로젝트 auto-memory를 공유한 오염이 확인됨(보고서
+> "타당성 위협" 참조) — C3 재측정은 `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` 격리 적용 후 수행.
 
 ---
 

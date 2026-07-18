@@ -946,7 +946,15 @@ function executeClaude(runDir, prompt) {
     "project",
     "--dangerously-skip-permissions",
   ];
-  const env = { ...process.env, NO_COLOR: "1" };
+  // AIDEV-NOTE: worktree sessions resolve project auto-memory to the MAIN repo
+  // (~/.claude/projects/<main-repo-path-slug>/memory), so runs shared a
+  // read/write memory and contaminated each other in claude-full-1 (verified
+  // 2026-07-18 via init-event memory_paths). Disable it for experiment runs.
+  const env = {
+    ...process.env,
+    NO_COLOR: "1",
+    CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
+  };
   delete env.CLAUDECODE;
   delete env.CLAUDE_CODE_ENTRYPOINT;
   delete env.CLAUDE_CODE_SSE_PORT;
