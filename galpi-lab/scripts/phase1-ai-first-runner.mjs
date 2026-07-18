@@ -22,6 +22,24 @@ const MODEL = "gpt-5.6-sol";
 const REASONING_EFFORT = "low";
 const TIMEOUT_MS = 300_000;
 
+const CLAUDE_CLI =
+  process.env.CLAUDE_CLI_PATH ??
+  path.join(process.env.USERPROFILE ?? "", ".local", "bin", "claude.exe");
+const CLAUDE_MODEL = "claude-sonnet-5";
+const CLAUDE_TIMEOUT_MS = 600_000;
+// AIDEV-NOTE: Claude Code 2.1.x does not auto-read AGENTS.md (verified 2026-07-17),
+// so B/C worktrees get an untracked CLAUDE.md bridge, mirroring how real Claude
+// deployments of Galpi bootstrap (galpi-lab uses the same file). The bridge is
+// counted as protocol context and excluded from change detection.
+const CLAUDE_BRIDGE_FILE = "CLAUDE.md";
+const CLAUDE_BRIDGE = [
+  "# Project instructions",
+  "",
+  "Read and follow `AGENTS.md` as the single source of project and Galpi Protocol instructions.",
+  "Do not duplicate or override those rules in this file.",
+  "",
+].join("\n");
+
 const CONDITIONS = {
   A: {
     label: "no Galpi",
@@ -259,6 +277,7 @@ console.log("hidden-roster: PASS");
 
 function parseArguments(argv) {
   const options = {
+    agent: "codex",
     repeats: 3,
     conditions: Object.keys(CONDITIONS),
     scenarios: Object.keys(SCENARIOS),
@@ -271,7 +290,9 @@ function parseArguments(argv) {
   for (const argument of argv) {
     if (argument === "--validate-only") options.validateOnly = true;
     else if (argument === "--keep-worktrees") options.keepWorktrees = true;
-    else if (argument.startsWith("--repeats=")) {
+    else if (argument.startsWith("--agent=")) {
+      options.agent = argument.slice("--agent=".length);
+    } else if (argument.startsWith("--repeats=")) {
       options.repeats = Number(argument.slice("--repeats=".length));
     } else if (argument.startsWith("--conditions=")) {
       options.conditions = argument
@@ -294,6 +315,9 @@ function parseArguments(argv) {
 
   if (!Number.isInteger(options.repeats) || options.repeats < 1) {
     throw new Error("--repeats must be a positive integer");
+  }
+  if (options.agent !== "codex" && options.agent !== "claude") {
+    throw new Error(`Unknown agent: ${options.agent}`);
   }
   for (const condition of options.conditions) {
     if (!CONDITIONS[condition]) throw new Error(`Unknown condition: ${condition}`);
@@ -323,34 +347,41 @@ function runSync(command, args, options = {}) {
   };
 }
 
-async function validateFixture() {
-  if (!CODEX_CLI || !existsSync(CODEX_CLI)) {
+async function validateFixture(agent) {
+  if (agent === "codex" && (!CODEX_CLI || !existsSync(CODEX_CLI))) {
     throw new Error("CODEX_MANAGED_PACKAGE_ROOT/bin/codex.js is unavailable");
+  }
+  if (agent === "claude" && !existsSync(CLAUDE_CLI)) {
+    throw new Error(`claude CLI unavailable: ${CLAUDE_CLI}`);
   }
   if (!existsSync(TSX_CLI)) throw new Error(`tsx CLI unavailable: ${TSX_CLI}`);
 
+  // AIDEV-NOTE: fixture commits predate the galpi/galpi-lab monorepo restructure,
+  // so their files sit at the repository root. git ls-tree resolves relative to
+  // the cwd prefix; run these checks from the repository toplevel, not galpi-lab.
+  const gitRoot = runSync("git", ["rev-parse", "--show-toplevel"]).stdout.trim();
   const sourceHashes = new Map();
   for (const [condition, config] of Object.entries(CONDITIONS)) {
     const resolved = runSync("git", ["rev-parse", config.commit]).stdout.trim();
     if (resolved !== config.commit) {
       throw new Error(`${condition} commit mismatch: ${resolved}`);
     }
-    const tree = runSync("git", ["ls-tree", "-r", config.commit, "src", "docs/plans", "package.json", "package-lock.json", "tsconfig.json"]).stdout;
+    const tree = runSync("git", ["ls-tree", "-r", config.commit, "src", "docs/plans", "package.json", "package-lock.json", "tsconfig.json"], { cwd: gitRoot }).stdout;
     sourceHashes.set(condition, tree);
   }
   if (new Set(sourceHashes.values()).size !== 1) {
     throw new Error("A/B/C application trees differ");
   }
 
-  const aFiles = runSync("git", ["ls-tree", "-r", "--name-only", CONDITIONS.A.commit]).stdout;
+  const aFiles = runSync("git", ["ls-tree", "-r", "--name-only", CONDITIONS.A.commit], { cwd: gitRoot }).stdout;
   if (/(^|\n)(AGENTS\.md|\.galpi\/)/.test(aFiles)) {
     throw new Error("Condition A unexpectedly contains Galpi instructions");
   }
-  const bFiles = runSync("git", ["ls-tree", "-r", "--name-only", CONDITIONS.B.commit]).stdout;
+  const bFiles = runSync("git", ["ls-tree", "-r", "--name-only", CONDITIONS.B.commit], { cwd: gitRoot }).stdout;
   if (!bFiles.includes(".galpi/MAP.yaml") || !bFiles.includes(".galpi/view/")) {
     throw new Error("Condition B human-readable runtime is incomplete");
   }
-  const cFiles = runSync("git", ["ls-tree", "-r", "--name-only", CONDITIONS.C.commit]).stdout;
+  const cFiles = runSync("git", ["ls-tree", "-r", "--name-only", CONDITIONS.C.commit], { cwd: gitRoot }).stdout;
   if (!cFiles.includes(".galpi/BOOT.gp") || !cFiles.includes(".galpi/v/")) {
     throw new Error("Condition C AI-first runtime is incomplete");
   }
@@ -408,6 +439,22 @@ function parseEvents(raw) {
   return events;
 }
 
+// AIDEV-NOTE: usage semantics are normalized across agents: input_tokens always
+// includes cached reads (Codex/OpenAI convention), cached_input_tokens is the
+// cache-read share. effective_tokens follows GitHub's Agentic Workflows formula
+// ET = m*(1.0*I_fresh + 0.1*I_cached + 4.0*O) with m=1 (single-model batches).
+function withDerivedUsage(usage) {
+  const input = usage.input_tokens ?? 0;
+  const cached = usage.cached_input_tokens ?? 0;
+  const output = usage.output_tokens ?? 0;
+  return {
+    ...usage,
+    total_tokens: input + output,
+    noncached_tokens: input - cached + output,
+    effective_tokens: input - cached + 0.1 * cached + 4.0 * output,
+  };
+}
+
 function collectTrace(events, scenario) {
   const commands = [];
   const messages = [];
@@ -434,6 +481,158 @@ function collectTrace(events, scenario) {
     if (event.type === "turn.completed" && event.usage) usage = event.usage;
   }
 
+  return analyzeTrace(
+    { commands, messages, finalAnswer: messages.at(-1) ?? "", usage },
+    scenario,
+  );
+}
+
+function relativeToRun(runDir, value) {
+  if (typeof value !== "string" || !value) return "";
+  const candidate = path.isAbsolute(value) ? path.relative(runDir, value) : value;
+  return normalizePath(candidate);
+}
+
+function synthesizeClaudeCommand(name, input, runDir) {
+  if (name === "Bash") return input?.command ?? "";
+  if (name === "Read") return `cat "${relativeToRun(runDir, input?.file_path)}"`;
+  if (name === "Grep") {
+    const scope = input?.path
+      ? relativeToRun(runDir, input.path)
+      : input?.glob ?? "";
+    return `rg "${input?.pattern ?? ""}" ${scope}`.trimEnd();
+  }
+  if (name === "Glob") {
+    const pattern = input?.pattern ?? "";
+    // AIDEV-NOTE: only repo-wide Glob patterns map to `rg --files` so that
+    // wholeRepositorySearch stays comparable with the Codex shell heuristic in
+    // isWholeRepositorySearch; directory-scoped listings are not repo scans.
+    const scoped = /^(?:src|docs|\.galpi)\b/.test(pattern);
+    return scoped ? `ls ${pattern}` : `rg --files ${pattern}`.trimEnd();
+  }
+  if (["Write", "Edit", "MultiEdit", "NotebookEdit"].includes(name)) {
+    return `${name.toLowerCase()} ${relativeToRun(runDir, input?.file_path)}`;
+  }
+  return `tool:${name}`;
+}
+
+function toolResultText(content) {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((block) =>
+        typeof block === "string"
+          ? block
+          : block?.type === "text"
+            ? block.text ?? ""
+            : "",
+      )
+      .join("\n");
+  }
+  return "";
+}
+
+function claudeInfrastructureFailure(resultEvent) {
+  if (!resultEvent?.is_error || typeof resultEvent.result !== "string") {
+    return null;
+  }
+  const message = resultEvent.result.trim();
+  const classifiers = [
+    ["usage_limit", /(?:session|usage|rate) limit|quota|too many requests/i],
+    ["authentication", /auth(?:entication)?|unauthorized|not logged in|login required/i],
+    ["availability", /overloaded|service unavailable|temporarily unavailable|network error/i],
+  ];
+  const match = classifiers.find(([, pattern]) => pattern.test(message));
+  if (!match) return null;
+  return {
+    provider: "claude",
+    kind: match[0],
+    message,
+  };
+}
+
+function collectClaudeTrace(events, scenario, runDir) {
+  const commands = [];
+  const byToolUseId = new Map();
+  const messages = [];
+  let resultEvent = null;
+
+  for (const event of events) {
+    if (event.type === "assistant") {
+      for (const block of event.message?.content ?? []) {
+        if (block?.type === "text" && block.text) messages.push(block.text);
+        if (block?.type === "tool_use") {
+          const entry = {
+            index: commands.length + 1,
+            command: synthesizeClaudeCommand(block.name, block.input ?? {}, runDir),
+            tool: block.name,
+            output: "",
+            exitCode: null,
+            status: "completed",
+          };
+          commands.push(entry);
+          if (block.id) byToolUseId.set(block.id, entry);
+        }
+      }
+    } else if (event.type === "user") {
+      const content = event.message?.content;
+      if (!Array.isArray(content)) continue;
+      for (const block of content) {
+        if (block?.type !== "tool_result") continue;
+        const entry = byToolUseId.get(block.tool_use_id);
+        if (!entry) continue;
+        entry.output = toolResultText(block.content);
+        entry.exitCode = block.is_error ? 1 : 0;
+      }
+    } else if (event.type === "result") {
+      resultEvent = event;
+    }
+  }
+
+  let usage = {
+    input_tokens: 0,
+    cached_input_tokens: 0,
+    cache_creation_input_tokens: 0,
+    output_tokens: 0,
+    reasoning_output_tokens: 0,
+  };
+  if (resultEvent) {
+    // AIDEV-NOTE: modelUsage is summed across all models (main + helper calls)
+    // so the accounting matches Codex sessions, which report whole-session usage.
+    const models = Object.values(resultEvent.modelUsage ?? {});
+    const sum = (key) =>
+      models.reduce((total, model) => total + (model[key] ?? 0), 0);
+    const cacheRead = sum("cacheReadInputTokens");
+    const cacheCreation = sum("cacheCreationInputTokens");
+    usage = {
+      input_tokens: sum("inputTokens") + cacheRead + cacheCreation,
+      cached_input_tokens: cacheRead,
+      cache_creation_input_tokens: cacheCreation,
+      output_tokens: sum("outputTokens"),
+      reasoning_output_tokens: 0,
+      total_cost_usd: resultEvent.total_cost_usd ?? null,
+    };
+  }
+
+  const finalAnswer =
+    (typeof resultEvent?.result === "string" && resultEvent.result) ||
+    (messages.at(-1) ?? "");
+  return analyzeTrace(
+    {
+      commands,
+      messages,
+      finalAnswer,
+      usage,
+      infrastructureFailure: claudeInfrastructureFailure(resultEvent),
+    },
+    scenario,
+  );
+}
+
+function analyzeTrace(
+  { commands, messages, finalAnswer, usage, infrastructureFailure = null },
+  scenario,
+) {
   const readFiles = new Set();
   const firstReadIndex = new Map();
   for (const item of commands) {
@@ -461,7 +660,6 @@ function collectTrace(events, scenario) {
   const unrelatedReads = [...readFiles].filter(
     (file) => !relevantReads.includes(file) && !protocolRead(file),
   );
-  const finalAnswer = messages.at(-1) ?? "";
   const clarificationOrParseFailure =
     /unable to parse|cannot parse|can't parse|invalid (?:galpi|protocol)|need clarification|please clarify|what does .*\.gp/i.test(
       messages.join("\n"),
@@ -488,14 +686,8 @@ function collectTrace(events, scenario) {
     ),
     clarificationOrParseFailure,
     successfulTestCommand,
-    usage: {
-      ...usage,
-      total_tokens: (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0),
-      noncached_tokens:
-        (usage.input_tokens ?? 0) -
-        (usage.cached_input_tokens ?? 0) +
-        (usage.output_tokens ?? 0),
-    },
+    infrastructureFailure,
+    usage: withDerivedUsage(usage),
   };
 }
 
@@ -660,29 +852,10 @@ function routeAndStateMetrics(condition, scenarioId, scenario, trace, changed) {
   return { routeSelected, stateRuleCompliant, stateEvidence };
 }
 
-function executeCodex(runDir, prompt) {
+function executeCli({ command, args, cwd, env, timeoutMs }) {
   return new Promise((resolve) => {
-    const args = [
-      CODEX_CLI,
-      "exec",
-      "--json",
-      "--ephemeral",
-      "--ignore-user-config",
-      "--color",
-      "never",
-      "--model",
-      MODEL,
-      "-c",
-      `model_reasoning_effort=\"${REASONING_EFFORT}\"`,
-      "--dangerously-bypass-approvals-and-sandbox",
-      "--cd",
-      runDir,
-      prompt,
-    ];
-    const env = { ...process.env, NO_COLOR: "1", PYTHONUTF8: "1" };
-    delete env.CODEX_THREAD_ID;
-    const child = spawn(process.execPath, args, {
-      cwd: ROOT,
+    const child = spawn(command, args, {
+      cwd,
       env,
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
@@ -706,7 +879,7 @@ function executeCodex(runDir, prompt) {
           encoding: "utf8",
         });
       }
-    }, TIMEOUT_MS);
+    }, timeoutMs);
     child.on("error", (error) => {
       clearTimeout(timer);
       resolve({ exitCode: null, stdout, stderr: `${stderr}\n${error.stack}`, timedOut });
@@ -715,6 +888,64 @@ function executeCodex(runDir, prompt) {
       clearTimeout(timer);
       resolve({ exitCode, stdout, stderr, timedOut });
     });
+  });
+}
+
+function executeCodex(runDir, prompt) {
+  const args = [
+    CODEX_CLI,
+    "exec",
+    "--json",
+    "--ephemeral",
+    "--ignore-user-config",
+    "--color",
+    "never",
+    "--model",
+    MODEL,
+    "-c",
+    `model_reasoning_effort=\"${REASONING_EFFORT}\"`,
+    "--dangerously-bypass-approvals-and-sandbox",
+    "--cd",
+    runDir,
+    prompt,
+  ];
+  const env = { ...process.env, NO_COLOR: "1", PYTHONUTF8: "1" };
+  delete env.CODEX_THREAD_ID;
+  return executeCli({
+    command: process.execPath,
+    args,
+    cwd: ROOT,
+    env,
+    timeoutMs: TIMEOUT_MS,
+  });
+}
+
+function executeClaude(runDir, prompt) {
+  const args = [
+    "-p",
+    prompt,
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--model",
+    CLAUDE_MODEL,
+    // AIDEV-NOTE: project-only setting sources keep the operator's global
+    // ~/.claude/CLAUDE.md rules out of the experiment (isolation verified
+    // 2026-07-17); the fixture's own CLAUDE.md bridge still loads.
+    "--setting-sources",
+    "project",
+    "--dangerously-skip-permissions",
+  ];
+  const env = { ...process.env, NO_COLOR: "1" };
+  delete env.CLAUDECODE;
+  delete env.CLAUDE_CODE_ENTRYPOINT;
+  delete env.CLAUDE_CODE_SSE_PORT;
+  return executeCli({
+    command: CLAUDE_CLI,
+    args,
+    cwd: runDir,
+    env,
+    timeoutMs: CLAUDE_TIMEOUT_MS,
   });
 }
 
@@ -736,6 +967,7 @@ async function removeWorktree(worktreeRoot, runDir) {
 }
 
 async function runOne({
+  agent,
   repeat,
   condition,
   scenarioId,
@@ -750,9 +982,17 @@ async function runOne({
   const startedAt = new Date().toISOString();
   const started = Date.now();
   console.log(`START ${runName}`);
+  const bridgeInjected =
+    agent === "claude" && config.bootstrapFiles.includes("AGENTS.md");
+  if (bridgeInjected) {
+    await writeFile(path.join(runDir, CLAUDE_BRIDGE_FILE), CLAUDE_BRIDGE, "utf8");
+  }
+  const bootstrapFiles = bridgeInjected
+    ? [CLAUDE_BRIDGE_FILE, ...config.bootstrapFiles]
+    : config.bootstrapFiles;
   const protocolContext = await countTokenFiles(
     runDir,
-    config.bootstrapFiles,
+    bootstrapFiles,
     encoder,
   );
   const queryResult = await countTokenFiles(
@@ -760,13 +1000,21 @@ async function runOne({
     scenario.queryFiles[condition] ?? [],
     encoder,
   );
-  const codex = await executeCodex(runDir, scenario.prompt);
-  await writeFile(path.join(logsDir, `${runName}.jsonl`), codex.stdout, "utf8");
-  await writeFile(path.join(logsDir, `${runName}.stderr.txt`), codex.stderr, "utf8");
+  const cli =
+    agent === "claude"
+      ? await executeClaude(runDir, scenario.prompt)
+      : await executeCodex(runDir, scenario.prompt);
+  await writeFile(path.join(logsDir, `${runName}.jsonl`), cli.stdout, "utf8");
+  await writeFile(path.join(logsDir, `${runName}.stderr.txt`), cli.stderr, "utf8");
 
-  const events = parseEvents(codex.stdout);
-  const trace = collectTrace(events, scenario);
-  const changed = changedPaths(runDir);
+  const events = parseEvents(cli.stdout);
+  const trace =
+    agent === "claude"
+      ? collectClaudeTrace(events, scenario, runDir)
+      : collectTrace(events, scenario);
+  const changed = changedPaths(runDir).filter(
+    (file) => !(bridgeInjected && file === CLAUDE_BRIDGE_FILE),
+  );
   const wrongChanges = changed.filter(
     (file) => !allowedChange(file, scenario, condition),
   );
@@ -791,6 +1039,7 @@ async function runOne({
   const finishedAt = new Date().toISOString();
   const result = {
     runName,
+    agent,
     repeat,
     condition,
     conditionLabel: config.label,
@@ -802,8 +1051,10 @@ async function runOne({
     startedAt,
     finishedAt,
     durationMs: Date.now() - started,
-    codexExitCode: codex.exitCode,
-    timedOut: codex.timedOut,
+    cliExitCode: cli.exitCode,
+    claudeBridgeInjected: bridgeInjected,
+    timedOut: cli.timedOut,
+    infrastructureFailure: trace.infrastructureFailure,
     eventCount: events.length,
     commandCount: trace.commands.length,
     finalAnswer: trace.finalAnswer,
@@ -848,11 +1099,43 @@ function rate(values) {
   return booleans.filter(Boolean).length / booleans.length;
 }
 
-function aggregateResults(results) {
+function expectedRunCount(metadata) {
+  return (
+    (metadata.repeats ?? 0) *
+    Object.keys(metadata.conditions ?? {}).length *
+    Object.keys(metadata.scenarios ?? {}).length
+  );
+}
+
+function aggregateResults(results, expectedRuns = results.length) {
+  // AIDEV-NOTE: provider failures invalidate the complete A/B/C pair for that
+  // repeat and scenario; keeping sibling rows would bias the paired comparison.
+  const pairKey = (row) => `${row.repeat}:${row.scenario}`;
+  const excludedPairKeys = new Set(
+    results.filter((row) => row.infrastructureFailure).map(pairKey),
+  );
+  const includedResults = results.filter(
+    (row) => !excludedPairKeys.has(pairKey(row)),
+  );
+  const excludedResults = results.filter((row) => excludedPairKeys.has(pairKey(row)));
+  const validity = {
+    complete: results.length === expectedRuns && excludedPairKeys.size === 0,
+    expectedRuns,
+    observedRuns: results.length,
+    includedRuns: includedResults.length,
+    excludedRuns: excludedResults.length,
+    excludedPairGroups: [...excludedPairKeys].sort(),
+    infrastructureFailures: results.filter((row) => row.infrastructureFailure).map(
+      (row) => ({
+        runName: row.runName,
+        ...row.infrastructureFailure,
+      }),
+    ),
+  };
   const byCondition = {};
   const byScenario = {};
   for (const condition of Object.keys(CONDITIONS)) {
-    const rows = results.filter((result) => result.condition === condition);
+    const rows = includedResults.filter((result) => result.condition === condition);
     if (!rows.length) continue;
     byCondition[condition] = {
       label: CONDITIONS[condition].label,
@@ -896,6 +1179,14 @@ function aggregateResults(results) {
       ),
       averageTotalTokens: average(rows.map((row) => row.usage.total_tokens)),
       totalTokens: rows.reduce((sum, row) => sum + row.usage.total_tokens, 0),
+      averageEffectiveTokens: average(
+        rows.map((row) => row.usage.effective_tokens),
+      ),
+      totalEffectiveTokens: rows.reduce(
+        (sum, row) => sum + (row.usage.effective_tokens ?? 0),
+        0,
+      ),
+      averageCostUsd: average(rows.map((row) => row.usage.total_cost_usd)),
       averageDurationMs: average(rows.map((row) => row.durationMs)),
       deadCodeReadRate: rate(rows.map((row) => row.deadCodeReads.length > 0)),
       deadCodeChangeRate: rate(rows.map((row) => row.deadCodeChanges.length > 0)),
@@ -905,7 +1196,7 @@ function aggregateResults(results) {
   for (const scenario of Object.keys(SCENARIOS)) {
     byScenario[scenario] = {};
     for (const condition of Object.keys(CONDITIONS)) {
-      const rows = results.filter(
+      const rows = includedResults.filter(
         (result) => result.scenario === scenario && result.condition === condition,
       );
       if (!rows.length) continue;
@@ -928,6 +1219,9 @@ function aggregateResults(results) {
           rows.map((row) => row.protocolComponentTokenProxy),
         ),
         averageTotalTokens: average(rows.map((row) => row.usage.total_tokens)),
+        averageEffectiveTokens: average(
+          rows.map((row) => row.usage.effective_tokens),
+        ),
         successfulTestCommandRate: rate(
           rows.map((row) => row.successfulTestCommand),
         ),
@@ -949,22 +1243,32 @@ function aggregateResults(results) {
           ((b.averageTotalTokens - c.averageTotalTokens) /
             b.averageTotalTokens) *
           100,
+        effectiveTokenReductionPercent:
+          Number.isFinite(b.averageEffectiveTokens) &&
+          Number.isFinite(c.averageEffectiveTokens) &&
+          b.averageEffectiveTokens > 0
+            ? ((b.averageEffectiveTokens - c.averageEffectiveTokens) /
+                b.averageEffectiveTokens) *
+              100
+            : null,
         evaluationDelta: c.evaluationPassRate - b.evaluationPassRate,
         routeSelectionDelta: c.routeSelectionRate - b.routeSelectionRate,
         stateComplianceDelta: c.stateComplianceRate - b.stateComplianceRate,
-        acceptsC:
-          c.evaluationPassRate >= b.evaluationPassRate &&
-          c.stateComplianceRate >= b.stateComplianceRate &&
-          c.averageProtocolComponentTokenProxy <
-            b.averageProtocolComponentTokenProxy &&
-          c.averageTotalTokens < b.averageTotalTokens &&
-          c.averageFirstRelevantCommand <= b.averageFirstRelevantCommand &&
-          c.averageUnrelatedReads <= b.averageUnrelatedReads &&
-          c.wholeRepositorySearchRate <= b.wholeRepositorySearchRate,
+        provisional: !validity.complete,
+        acceptsC: validity.complete
+          ? c.evaluationPassRate >= b.evaluationPassRate &&
+            c.stateComplianceRate >= b.stateComplianceRate &&
+            c.averageProtocolComponentTokenProxy <
+              b.averageProtocolComponentTokenProxy &&
+            c.averageTotalTokens < b.averageTotalTokens &&
+            c.averageFirstRelevantCommand <= b.averageFirstRelevantCommand &&
+            c.averageUnrelatedReads <= b.averageUnrelatedReads &&
+            c.wholeRepositorySearchRate <= b.wholeRepositorySearchRate
+          : null,
       }
     : null;
 
-  return { byCondition, byScenario, comparison };
+  return { validity, byCondition, byScenario, comparison };
 }
 
 async function reanalyzeExisting(outputRoot) {
@@ -973,6 +1277,7 @@ async function reanalyzeExisting(outputRoot) {
   const metadataPath = path.join(outputRoot, "metadata.json");
   const previous = JSON.parse(await readFile(resultsPath, "utf8"));
   const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
+  const agent = metadata.agent ?? "codex";
   const revised = [];
 
   for (const old of previous) {
@@ -982,7 +1287,14 @@ async function reanalyzeExisting(outputRoot) {
       "utf8",
     );
     const events = parseEvents(raw);
-    const trace = collectTrace(events, scenario);
+    const trace =
+      agent === "claude"
+        ? collectClaudeTrace(
+            events,
+            scenario,
+            path.join(outputRoot, "worktrees", old.runName),
+          )
+        : collectTrace(events, scenario);
     const changed = old.changedPaths.map(normalizePath);
     const wrongChanges = changed.filter(
       (file) => !allowedChange(file, scenario, old.condition),
@@ -1013,6 +1325,7 @@ async function reanalyzeExisting(outputRoot) {
       stateEvidence: routeState.stateEvidence,
       clarificationOrParseFailure: trace.clarificationOrParseFailure,
       successfulTestCommand: trace.successfulTestCommand,
+      infrastructureFailure: trace.infrastructureFailure,
       changedPaths: changed,
       wrongChanges,
       deadCodeReads: trace.readFiles.filter((file) =>
@@ -1026,13 +1339,18 @@ async function reanalyzeExisting(outputRoot) {
     });
   }
 
-  const aggregate = aggregateResults(revised);
+  const aggregate = aggregateResults(revised, expectedRunCount(metadata));
   metadata.reanalyzedAt = new Date().toISOString();
+  metadata.completedRuns = revised.length;
+  metadata.validRuns = aggregate.validity.includedRuns;
+  metadata.excludedRuns = aggregate.validity.excludedRuns;
+  metadata.complete = aggregate.validity.complete;
   metadata.reanalysis = [
     "accept WIP and work-in-progress as equivalent prerequisite wording",
     "accept equivalent Korean billing-answer terminology",
     "collapse duplicate Windows path separators before route/read metrics",
     "treat a roster test-script update and B's required Galpi synchronization as in-scope changes",
+    "exclude provider infrastructure failures and their paired A/B/C rows from acceptance metrics",
   ];
   const backupPath = path.join(outputRoot, "results.before-reanalysis.json");
   if (!existsSync(backupPath)) {
@@ -1050,7 +1368,7 @@ async function reanalyzeExisting(outputRoot) {
 
 async function main() {
   const options = parseArguments(process.argv.slice(2));
-  await validateFixture();
+  await validateFixture(options.agent);
   console.log("VALID fixture parity and condition structure");
   if (options.reanalyze) {
     await reanalyzeExisting(path.resolve(ROOT, options.reanalyze));
@@ -1079,9 +1397,11 @@ async function main() {
     startedAt: new Date().toISOString(),
     runId: options.runId,
     outputRoot,
-    model: MODEL,
-    reasoningEffort: REASONING_EFFORT,
-    timeoutMs: TIMEOUT_MS,
+    agent: options.agent,
+    model: options.agent === "claude" ? CLAUDE_MODEL : MODEL,
+    reasoningEffort: options.agent === "claude" ? null : REASONING_EFFORT,
+    timeoutMs: options.agent === "claude" ? CLAUDE_TIMEOUT_MS : TIMEOUT_MS,
+    claudeBridge: options.agent === "claude" ? CLAUDE_BRIDGE : null,
     tokenizerProxy: "o200k_base",
     repeats: options.repeats,
     conditions: Object.fromEntries(
@@ -1124,6 +1444,7 @@ async function main() {
         const block = await Promise.all(
           prepared.map(({ condition, runDir }) =>
             runOne({
+              agent: options.agent,
               repeat,
               condition,
               scenarioId,
@@ -1151,9 +1472,12 @@ async function main() {
     if (typeof encoder.free === "function") encoder.free();
   }
 
-  const aggregate = aggregateResults(results);
+  const aggregate = aggregateResults(results, expectedRunCount(metadata));
   metadata.finishedAt = new Date().toISOString();
   metadata.completedRuns = results.length;
+  metadata.validRuns = aggregate.validity.includedRuns;
+  metadata.excludedRuns = aggregate.validity.excludedRuns;
+  metadata.complete = aggregate.validity.complete;
   await Promise.all([
     writeFile(
       path.join(outputRoot, "metadata.json"),
