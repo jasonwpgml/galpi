@@ -13,10 +13,32 @@ import { getEncoding } from "js-tiktoken";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(SCRIPT_DIR, "..");
+// AIDEV-NOTE: CODEX_MANAGED_PACKAGE_ROOT (bin/codex.js, run via node) only exists
+// inside Codex CLI sessions; standalone environments have the installed codex.exe.
+// Both launch modes must pass identical exec flags so measurements stay comparable.
 const CODEX_ROOT = process.env.CODEX_MANAGED_PACKAGE_ROOT;
 const CODEX_CLI = CODEX_ROOT
   ? path.join(CODEX_ROOT, "bin", "codex.js")
   : undefined;
+const CODEX_EXE =
+  process.env.CODEX_EXE ??
+  path.join(
+    process.env.LOCALAPPDATA ?? "",
+    "Programs",
+    "OpenAI",
+    "Codex",
+    "bin",
+    "codex.exe",
+  );
+function codexLaunch() {
+  if (CODEX_CLI && existsSync(CODEX_CLI)) {
+    return { command: process.execPath, prefixArgs: [CODEX_CLI] };
+  }
+  if (CODEX_EXE && existsSync(CODEX_EXE)) {
+    return { command: CODEX_EXE, prefixArgs: [] };
+  }
+  return null;
+}
 const TSX_CLI = path.join(ROOT, "node_modules", "tsx", "dist", "cli.mjs");
 const MODEL = "gpt-5.6-sol";
 const REASONING_EFFORT = "low";
@@ -351,8 +373,10 @@ function runSync(command, args, options = {}) {
 }
 
 async function validateFixture(agent) {
-  if (agent === "codex" && (!CODEX_CLI || !existsSync(CODEX_CLI))) {
-    throw new Error("CODEX_MANAGED_PACKAGE_ROOT/bin/codex.js is unavailable");
+  if (agent === "codex" && !codexLaunch()) {
+    throw new Error(
+      "codex CLI unavailable: neither CODEX_MANAGED_PACKAGE_ROOT/bin/codex.js nor codex.exe (CODEX_EXE) found",
+    );
   }
   if (agent === "claude" && !existsSync(CLAUDE_CLI)) {
     throw new Error(`claude CLI unavailable: ${CLAUDE_CLI}`);
@@ -836,10 +860,30 @@ function routeAndStateMetrics(condition, scenarioId, scenario, trace, changed) {
     const statusFile = scenario.statusFiles[condition];
     const statusIndex = trace.firstReadIndex[statusFile];
     const firstCodeIndex = trace.firstRelevantCommand;
-    const statusFirst =
+    let statusFirst =
       Number.isInteger(statusIndex) &&
       Number.isInteger(firstCodeIndex) &&
       statusIndex < firstCodeIndex;
+    // AIDEV-NOTE: command indices tie when an agent batches the status read and
+    // the first code reads into one shell command (observed in codex-c3-1
+    // sorting: `Get-Content status; rg src/student/...`). Intra-command text
+    // order decides the tie; this can only upgrade false -> true, never revoke.
+    if (
+      !statusFirst &&
+      Number.isInteger(statusIndex) &&
+      statusIndex === firstCodeIndex
+    ) {
+      const tied = trace.commands.find((item) => item.index === statusIndex);
+      if (tied) {
+        const text = String(tied.command);
+        const statusAt = text.indexOf(statusFile);
+        const codeOffsets = scenario.relevantPrefixes
+          .map((prefix) => text.indexOf(prefix))
+          .filter((at) => at >= 0);
+        const codeAt = codeOffsets.length ? Math.min(...codeOffsets) : -1;
+        statusFirst = statusAt >= 0 && codeAt >= 0 && statusAt < codeAt;
+      }
+    }
     stateRuleCompliant = routeSelected && statusFirst;
     stateEvidence = statusFirst
       ? `${statusFile} read before student code`
@@ -902,8 +946,9 @@ function executeCli({ command, args, cwd, env, timeoutMs }) {
 }
 
 function executeCodex(runDir, prompt) {
+  const launch = codexLaunch();
   const args = [
-    CODEX_CLI,
+    ...launch.prefixArgs,
     "exec",
     "--json",
     "--ephemeral",
@@ -922,7 +967,7 @@ function executeCodex(runDir, prompt) {
   const env = { ...process.env, NO_COLOR: "1", PYTHONUTF8: "1" };
   delete env.CODEX_THREAD_ID;
   return executeCli({
-    command: process.execPath,
+    command: launch.command,
     args,
     cwd: ROOT,
     env,

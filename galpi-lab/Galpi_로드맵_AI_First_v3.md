@@ -255,6 +255,23 @@ V|v/t/a.login.gp
 // the existing GET list contract depends on this behavior.
 ```
 
+### 언어 정책 (2026-07-19)
+
+AI가 읽고 쓰는 층은 영어, 사람이 결정하는 층은 팀 언어(현재 한국어)로 고정한다.
+근거는 헌법 9·10조: 주요 tokenizer에서 한국어는 같은 의미에 영어의 2~3배 토큰을 쓰고,
+행동 지시의 추종 안정성과 교차 에이전트 일관성도 영어가 우위다.
+
+| 층 | 언어 | 예 |
+|---|---|---|
+| AI 런타임 | 영어 | `.gp` 레코드, opcode, `q=` 요약, BOOT 행동 규칙 |
+| 코드 인접 | 영어 | AIDEV 앵커(위 정책), 코드 주석, 커밋 메시지 |
+| 에이전트 조율 | 영어 | `.galpi/handoff.md` 신규 항목, 검증 원장, PR 리뷰 |
+| 사람 결정 층 | 한국어 | 로드맵, 실험 보고서, `galpi explain --human` 출력 |
+
+**예외 — route alias는 데이터다.** `R|학생등록|st.create` 같은 다국어 alias는 지시가
+아니라 사용자 어휘의 매핑이므로 제거하지 않는다 (Phase 5 별칭 해시 인덱스가 승계).
+사람 결정 층의 언어는 팀 구성이 바뀌면 바꿀 수 있고, 런타임 층의 영어는 고정이다.
+
 ---
 
 ## 6. 멀티 에이전트 협업 체계 (Claude Code × Codex)
@@ -441,8 +458,10 @@ src/
   (`phase1-ai/fixture-c3` = `3c5a284`, 소스 트리는 A/B/C2와 byte-identical 검증).
 - [x] Claude 측 C3 격리 재측정 (2026-07-19, `claude-c3-1`): 45/45 유효,
   `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` 적용 — 45개 로그 전부 `memory_paths` 0건 확인.
-- [ ] Codex 측 C3 재측정 (Codex 담당) — C2에서 규율 100%였던 Codex에서 C3 명시성이
-  토큰만 늘리는지(순손해) 중립인지 확인.
+- [x] Codex 측 C3 재측정 (2026-07-19, `codex-c3-1`): 45/45 유효, **전 지표 우세로
+  엄격 게이트 통과 (`acceptsC: true`)** — 토큰 -20.3%(C2의 -16.6%보다 큼), 정확도 100%,
+  route/state 100%, 전체 검색 0%. 명시성 상향은 Codex에서 순이득.
+  (운영 주체: Claude 세션이 러너 실행, subject는 Codex CLI — 보고서에 기록)
 
 > **판정 결과 (2026-07-18)**: Claude에서 C2는 토큰 -27.1%(ET -22.0%)·route +20%p·state
 > +6.7%p로 이겼지만 정확도 93.3%(<B 100%, 1회 차)와 탐색 효율(관련 없는 읽기·전체 검색·
@@ -467,6 +486,16 @@ src/
 > ③ 계속 갈리면 모델별 profile 분기를 Phase 2 설계에 앞당김 — 규율 비용을 프롬프트 순응이
 > 아닌 PreToolUse 훅(셸 단 강제)으로 이전하는 안 포함. 상세: `docs/experiments/phase1-claude.md`
 > "C3 격리 재측정" 섹션.
+
+> **C3 판정 결과 — Codex 측 + 게이트 종합 (2026-07-19)**: Codex에서 C3는 **전 지표 우세로
+> 엄격 게이트 통과** — 정확도 100%, route/state 100%, 관련 없는 읽기 -89%, 전체 검색 0%,
+> 토큰 -20.3%(ET -21.0%). C2보다도 절감 폭이 크다. 종합: **C3의 규율·정확도 이득은
+> agent-agnostic** (양쪽 정확도 100%, DEAD 0%, parse 실패 0). 남은 유일한 분기는 Claude의
+> 순응 토큰 비용(+12.1%)뿐. 권고: C3를 GALPI/1 표준 문법으로 채택하고, Phase 2 진입을
+> 사람에게 요청 — Claude 토큰 열세는 Phase 2 PreToolUse 훅 게이팅이 직접 겨냥하는 문제이며,
+> profile 분기는 훅 실측 후에도 열세가 남을 때만 착수. sorting 채점의 커맨드 동률 문제를
+> 커맨드 내부 순서로 해소하도록 checker 보정(양 배치 재분석, Claude 수치 불변).
+> 상세: `docs/experiments/phase1-claude.md` "Codex 측 C3 재측정" 섹션.
 
 ---
 
