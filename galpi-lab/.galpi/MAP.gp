@@ -1,4 +1,4 @@
-G|1|manual
+G|1|gen
 R|login|a.login
 R|signin|a.login
 R|로그인|a.login
