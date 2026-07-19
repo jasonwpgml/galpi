@@ -8,8 +8,8 @@ export function getStudent(
   return students.get(id);
 }
 
-// AIDEV-NOTE: calls without options must return the repository order unchanged;
-// the existing GET list API depends on that default (see .galpi/status/st.gp).
+// AIDEV-NOTE: contract -- Calls without options must preserve repository order;
+// the existing GET list API depends on this behavior.
 export function listStudents(
   students: StudentRepository,
   options?: ListStudentsOptions,
