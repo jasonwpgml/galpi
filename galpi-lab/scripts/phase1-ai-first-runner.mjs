@@ -54,9 +54,9 @@ const CONDITIONS = {
     bootstrapFiles: ["AGENTS.md", ".galpi/MAP.yaml"],
   },
   C: {
-    label: "AI-first Galpi",
-    branch: "phase1-ai/fixture-c2",
-    commit: "e55540a6330823969e0cf82589db181e77eb0752",
+    label: "AI-first Galpi C3",
+    branch: "phase1-ai/fixture-c3",
+    commit: "3c5a28469508b7c58407bdc75f7957654d0bfaf7",
     bootstrapFiles: ["AGENTS.md", ".galpi/BOOT.gp", ".galpi/MAP.gp"],
   },
 };

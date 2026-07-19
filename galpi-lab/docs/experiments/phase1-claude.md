@@ -1,8 +1,11 @@
 # Phase 1.5 — Claude Code 교차 검증
 
 측정일: 2026-07-17 (r3 인프라 실패분은 2026-07-18 재실행)
+재측정일: 2026-07-19 — C3 fixture + auto-memory 격리 배치 `claude-c3-1` (아래 "C3 격리 재측정" 섹션)
 
-최종 판정: **엄격 게이트 미통과 (`acceptsC: false`) — 로드맵 분기에 따라 C3 opcode 명시성 상향 후 양쪽 재측정 대상.**
+최종 판정: **C2·C3 모두 엄격 게이트 미통과 (`acceptsC: false`). 단, 실패 축이 반전됨 —
+C2는 토큰을 아끼고 규율에서 졌고, C3는 정확도 100%·규율 우세를 얻는 대신 토큰에서 졌다.
+Codex 측 C3 재측정 대기.**
 
 ## 요약
 
@@ -152,3 +155,105 @@ Codex 측정의 재분석 규칙에 더해, 조건 C의 `.galpi/` 상태 동기�
 - 재실행: `node scripts/phase1-ai-first-runner.mjs --agent=claude --repeats=3 --run-id=<new-run-id>`
 - 재분석: `node scripts/phase1-ai-first-runner.mjs --agent=claude --reanalyze=.experiments/phase1-ai-first-runs/<run-id>`
 - 인프라 실패 짝 그룹 재실행: `node scripts/phase1-ai-first-runner.mjs --retry-excluded=.experiments/phase1-ai-first-runs/<run-id>`
+
+---
+
+# C3 격리 재측정 (2026-07-19)
+
+## 배경과 변경점
+
+C2 측정의 두 가지 문제에 대응했다.
+
+1. **오염 제거**: 위 "타당성 위협"의 auto-memory 공유를 `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`로
+   차단. 이번 배치는 45/45 로그 전부에서 init-event `memory_paths` 0건으로 격리 검증됨.
+   격리 스모크(`c3-smoke-1`) 1회로 사전 확인 후 본 배치 실행.
+2. **C3 fixture** (`3c5a284`, `phase1-ai/fixture-c3`): opcode 명시성 상향. 문법 사전(K/S/A/C)은
+   C2와 동일하고 행동(B) 레코드만 명시화했다.
+   - `BOOT.gp`: `view_trust`(F 목록은 완전, 검증용 grep/scan 금지), `wip_hot`(코드 열기 전
+     status 먼저), `dead`(절대 열지 않고 replacement 링크만), `after_work`(status 동기화),
+     `status_lines`(next·constraint는 구속력 있음).
+   - `status/st.gp`: **B 정보 격차 복원** — 정렬 옵션 없을 때 삽입 순서 유지 불변식과
+     `lesson_calls_get_for_existence` 제약. 이 두 정보는 B의 `status/student.md`에는 있었지만
+     C2에는 없었다. C2의 유일한 정확도 실패(r1-c-sorting)가 바로 이 불변식 위반이었으므로,
+     C2의 정확도 열세는 opcode 문제이기 전에 정보 격차였다.
+   - `v/t/st.list.gp`, `v/t/lg.import.gp`: 사용 지점에 order/scope/deny 행동 줄 추가.
+   - 소스 트리는 A/B/C2와 byte-identical 유지 (git ls-tree 대조로 검증).
+
+실행: `claude-sonnet-5`, A/B/C3 × 5시나리오 × 3반복 = 45회. 1차 실행에서 r3 15회가
+세션 사용량 한도(`usage_limit`)로 인프라 실패 → 한도 리셋 후 `--retry-excluded`로
+짝 그룹 5개(15회) 재실행, 45/45 유효.
+
+## 집계 (격리 배치)
+
+| 측정값 | A | B | C3 | C3 vs B |
+|---|---:|---:|---:|---:|
+| 작업 정확도 | 93.3% | 93.3% | **100%** | **+6.7%p** |
+| route 선택률 | N/A | 86.7% | 86.7% | 0 |
+| 상태 규칙 준수율 | N/A | 66.7% | **86.7%** | **+20%p** |
+| 관련 없는 파일 읽기 | 7.47 | 4.07 | **1.20** | **-70.5%** |
+| DEAD 파일 읽기율 | 40% | 13.3% | **0%** | **-13.3%p** |
+| 오수정률 | 13.3% | 0% | 0% | 동일 |
+| 전체 저장소 검색률 | 26.7% | 26.7% | 33.3% | +6.7%p |
+| 최초 관련 파일 call | 2.47 | 5.54 | 6.79 | +22.5% |
+| protocol component proxy tokens | 0 | 1,302.4 | 959.0 | -26.4% |
+| 실제 총 토큰 평균 | 310,735 | 472,732 | 529,982 | **+12.1%** |
+| 유효 토큰(ET) 평균 | 59,661 | 85,166 | 95,274 | **+11.9%** |
+| 평균 비용 (USD) | $0.233 | $0.328 | $0.361 | +9.9% |
+| 평균 실행 시간 | 52.7초 | 70.2초 | 84.4초 | +20.2% |
+| parse 실패·재질문 | 0 | 0 | 0 | 동일 |
+
+시나리오별 (eval / route / state, C3 평균 토큰 vs B):
+
+| 시나리오 | B | C3 | 토큰 C3 vs B |
+|---|---|---|---:|
+| DONE login | 100/100/100% | 100/67/67% | 383k vs 367k |
+| WIP+HOT sorting | 100/33/33% | **100/100/100%** | 937k vs 654k |
+| PLAN billing | 67/100/33% | **100/100/100%** | 165k vs 221k |
+| DEAD roster | 100/100/67% | **100/100/100%** | 983k vs 948k |
+| non-exact session-flow | 100/100/100% | 100/67/67% | 182k vs 174k |
+
+## 판정
+
+엄격 게이트 `acceptsC: false` — 그러나 실패 축이 C2와 정반대다.
+
+- **C3가 이긴 것**: 정확도 100%(유일한 무결점 조건), 상태 준수 +20%p, 관련 없는 읽기 -70%,
+  DEAD 읽기 0%, protocol component 토큰 -26.4%. C2의 실패 원인(sorting 불변식, status 생략,
+  DEAD 접근)이 전부 해소됐다.
+- **C3가 진 것**: 실제 총 토큰 +12.1%, ET +11.9%, 실행 시간 +20.2%, 최초 도달 +22.5%.
+  C2가 갖고 있던 토큰 우위가 사라졌다.
+
+원인 해석: 명시성 상향은 Claude의 프로토콜 생략을 실제로 교정했고, 그 교정된 순응
+(status 선행 읽기, View 신뢰, 작업 후 status 동기화)이 그대로 토큰·시간 비용이 됐다.
+즉 **Claude에서 규율과 토큰은 트레이드오프 관계**로 측정됐다. 규율을 강제할수록
+프로토콜 수행 비용이 정직하게 과금된다.
+
+부가 관찰:
+
+- 격리 후 A와 B의 정확도가 모두 93.3%로 수렴했다(오염 배치에서는 A 86.7%, B 100%).
+  오염이 절대값을 실제로 왜곡했다는 방증이며, 오염 배치와 격리 배치의 수치를 직접
+  비교해서는 안 된다.
+- B의 실패는 billing(정확도 67%, state 33%)에서 나왔다. C3는 billing에서 B보다 정확하고
+  쌌다(165k vs 221k). C3의 토큰 열세는 전적으로 sorting(+43%)에서 발생했는데, 이는
+  C3에서 유일하게 route/state 100%를 지키며 status 왕복과 동기화까지 수행한 시나리오다.
+- session-flow(정확 route 없음)는 C3의 최약점으로 남았다(route 67%, scan 67%).
+  route_miss 추론 경로는 명시성 상향의 효과가 제한적이다.
+
+## 다음 단계
+
+1. **Codex 측 C3 재측정** (교차 게이트의 나머지 절반, Codex 담당).
+   Codex는 C2에서 이미 규율 100%였으므로, C3의 추가 명시성이 Codex에서 토큰만 늘리는지
+   (C2 대비 순손해) 아니면 중립인지가 관건.
+2. 게이트 해석 논점을 사람에게 이관: 현행 엄격 게이트는 정확도·규율·토큰을 모두
+   동시 개선해야 통과다. Claude 측정이 보여준 규율↔토큰 트레이드오프 아래에서
+   "정확도 100% + 규율 우세 + 토큰 +12%"를 실패로 볼지는 가치 판단이다.
+   특히 잘못된 수정·DEAD 접근이 0인 조건은 재작업 비용까지 계산하면 우위일 수 있다.
+3. 양쪽 결과가 계속 갈리면 로드맵 분기대로 **모델별 protocol profile**(Phase 5 항목)을
+   Phase 2 설계에 앞당긴다: Codex에는 C2 수준 축약, Claude에는 C3 수준 명시성 또는
+   PreToolUse 훅 게이팅(프롬프트 순응 대신 물리적 강제)으로 규율 비용을 셸 단으로 이전.
+
+## 데이터와 재실행 (C3 배치)
+
+- 결과: `.experiments/phase1-ai-first-runs/claude-c3-1/`
+  (격리 스모크: `.experiments/phase1-ai-first-runs/c3-smoke-1/`)
+- fixture: `phase1-ai/fixture-c3` = `3c5a28469508b7c58407bdc75f7957654d0bfaf7`
+- 재실행: `node scripts/phase1-ai-first-runner.mjs --agent=claude --repeats=3 --run-id=<new-run-id>`
