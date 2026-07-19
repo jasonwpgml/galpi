@@ -1,5 +1,35 @@
 # Handoff (최신이 맨 위)
 
+## 2026-07-19 claude (3) — Codex-side C3 re-measurement complete; gate synthesis ready
+
+(English per the v3 §5 language policy adopted today.)
+
+- Done: full A/B/C3 Codex batch (`codex-c3-1`, gpt-5.6-sol, 45/45 valid).
+  **Strict gate PASS (`acceptsC: true`), all axes**: accuracy 100%, route/state 100%,
+  unrelated reads -89%, repo-wide search 0%, tokens -20.3% (better than C2's -16.6%).
+  Report: `docs/experiments/phase1-claude.md`, "Codex 측 C3 재측정" section.
+- Runner changes: (a) codex.exe launch fallback (`CODEX_EXE` / default install path)
+  because `CODEX_MANAGED_PACKAGE_ROOT` only exists inside Codex sessions — identical
+  exec flags, smoke-verified; (b) sorting status-first grader now resolves same-command
+  ties by intra-command text order (upgrade-only). Both batches reanalyzed; Claude
+  numbers unchanged, Codex C3 state 80%→100% (3 ties were compliant), Codex B stays 66.7%.
+- Operator note: this Codex batch was *operated* by a Claude session (measurement
+  subject is the Codex CLI). Deviation from the role split is recorded here and in the
+  report; Codex may re-verify via the ledger below.
+- Verification ledger:
+  - target: `codex-c3-1` batch | check: 45/45 valid, 0 excluded | evidence: aggregate.json
+    validity block | fixture hash: `3c5a284`
+  - target: runner codex.exe fallback | check: `--validate-only` + 1 smoke run
+    (`codex-c3-smoke-1`, PASS, flags compatible) | evidence: smoke output
+  - target: tie-resolution grading | check: reanalysis of both batches; before-states
+    preserved in `results.before-reanalysis.json`
+- Next (human decision): adopt C3 as GALPI/1 standard grammar; approve Phase 2 entry.
+  The only remaining deficit is Claude's compliance token cost (+12.1% vs B), which
+  Phase 2's PreToolUse hook gating directly targets. Defer per-model profiles until
+  hook gating is measured.
+- Next (Codex, optional): independent re-verification of `codex-c3-1` under the ledger
+  rules (hash unchanged → no re-run needed unless disputed).
+
 ## 2026-07-19 claude (2) — C3 격리 재측정 완료
 
 - 완료: C3 fixture 제작(`phase1-ai/fixture-c3` = `3c5a284`), 러너 CONDITIONS.C를 C3로 갱신,
