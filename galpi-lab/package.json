@@ -8,9 +8,10 @@
     "build": "tsup src/main.ts --format esm --sourcemap --clean",
     "demo": "tsx src/main.ts",
     "start": "node dist/main.js",
-    "test": "tsx --test src/auth/auth.test.login.ts src/student/student.test.crud.ts src/lesson/lesson.test.enrollment.ts",
+    "test": "tsx --test src/auth/auth.test.login.ts src/student/student.test.crud.ts src/lesson/lesson.test.enrollment.ts tools/galpi/galpi.test.ts",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test && npm run build"
+    "galpi": "tsx tools/galpi/cli.ts",
+    "check": "npm run typecheck && npm test && npm run galpi -- check && npm run build"
   },
   "engines": {
     "node": ">=20"

@@ -497,6 +497,11 @@ src/
 > 커맨드 내부 순서로 해소하도록 checker 보정(양 배치 재분석, Claude 수치 불변).
 > 상세: `docs/experiments/phase1-claude.md` "Codex 측 C3 재측정" 섹션.
 
+> **게이트 확정 (2026-07-19, 사람 승인)**: **C3를 GALPI/1 표준 문법으로 채택하고 Phase 2
+> 진입을 승인.** Claude의 순응 토큰 열세(+12.1%)는 Phase 2 PreToolUse 훅 게이팅으로 대응하고,
+> 모델별 profile 분기는 훅 실측 후에도 열세가 남을 때만 착수한다. galpi-lab 라이브
+> `.galpi` 런타임을 C3 문법으로 전환함. **Phase 1.5 종료.**
+
 ---
 
 ## Phase 2 — `galpi check` + `galpi doctor` + 변형 커맨드
@@ -506,35 +511,39 @@ src/
 
 ### 체크리스트
 
-- [ ] `tools/galpi/` CLI 생성.
-- [ ] `.gp` parser와 schema validator 구현.
-- [ ] 중복 ID, 미정의 opcode, 잘못된 상태 코드, 끊어진 참조를 오류 처리.
-- [ ] **변형 커맨드 구현** (source.gp 수기 편집 대체):
+- [x] `tools/galpi/` CLI 생성. (`npm run galpi -- <command>`, tsx 실행)
+- [x] `.gp` parser와 schema validator 구현.
+- [x] 중복 ID, 미정의 opcode, 잘못된 상태 코드, 끊어진 참조를 오류 처리.
+  (+ view 상태 desync, MAP desync 검사 — source가 단일 원본임을 기계 강제)
+- [x] **변형 커맨드 구현** (source.gp 수기 편집 대체):
   - `galpi set-state <id> <code>` — 상태 변경 (유효 코드 검증 포함)
   - `galpi add-route <alias> <task-id>` / `galpi rm-route <alias>`
   - `galpi add-task <id> <state> [q=...]` / `galpi add-domain <id> <state> <path>`
   - 모든 변형 커맨드는 쓰기 전 schema 검증, 쓴 후 참조 무결성 검증을 통과해야 커밋.
-- [ ] **`galpi doctor` — 구조 진단 (읽기 전용, 코드 수정 없음)**:
+- [x] **`galpi doctor` — 구조 진단 (읽기 전용, 코드 수정 없음)**:
+  (불변식 후보는 view constraint 링크 기반 `missing_anchor`로 구현 — task의 구현
+  파일 중 어디에도 AIDEV 앵커가 없을 때만 보고)
   - 모호한 파일·심볼 이름 (도메인·역할을 이름에서 추론할 수 없는 경우)
   - 책임이 섞인 대형 파일 (여러 도메인/task가 한 파일에 공존)
   - 구현과 떨어진 테스트 배치 (test → 구현 파일 매핑 불가)
   - index 우회 deep import
   - 앵커 없는 숨은 불변식 후보 (테스트가 단언하지만 코드·주석 어디에도 명시되지 않은 제약)
   - 출력: `--ai` compact 진단 패킷 / `--human` 설명. 진단 항목은 Phase 3.5 규칙집의 입력이 된다.
-- [ ] 각 도메인 git tree hash와 `verified` 값 비교.
-- [ ] 불일치 시 상태를 런타임에서 `5`로 취급.
-- [ ] `PLAN`에 코드가 발견되면 오류.
-- [ ] `DEAD`가 외부 import되면 오류.
-- [ ] `LOCK` 파일 수정 감지.
-- [ ] **PreToolUse 훅 게이팅**: 에이전트 래퍼(Claude Code hooks 등)에서 `.galpi` 상태 파서를
+- [x] 각 도메인 git tree hash와 `verified` 값 비교. (`verified=` 필드, dirty 포함)
+- [x] 불일치 시 상태를 런타임에서 `5`로 취급. (check가 `ERR|stale` 보고, 강등 적용은 소비자)
+- [x] `PLAN`에 코드가 발견되면 오류.
+- [x] `DEAD`가 외부 import되면 오류.
+- [x] `LOCK` 파일 수정 감지.
+- [x] **PreToolUse 훅 게이팅**: 에이전트 래퍼(Claude Code hooks 등)에서 `.galpi` 상태 파서를
   재사용해 DEAD(4)·LOCK(l) 경로에 대한 write/edit 도구 호출을 셸 단에서 거부.
   상태 규약을 프롬프트 추종이 아니라 물리적으로 강제한다 (SWE-agent ACI의 린터 게이트 준용).
 - [ ] (실험 설계) 더 큰 fixture 재측정에 3개 파일 이상을 고치는 multi-file 변경 시나리오 포함.
   구조 인덱스의 정확도 이득이 multi-file 변경에서 최대라는 외부 실증 반영
   (`docs/plans/external-review-2026-07.md` 참조).
-- [ ] `galpi check --ai`는 compact 오류 패킷 출력.
-- [ ] `galpi check --human` 또는 `galpi explain errors`는 사람용 설명 출력.
-- [ ] pre-commit과 CI에 `galpi check` 연결.
+- [x] `galpi check --ai`는 compact 오류 패킷 출력. (`--ai`가 기본값)
+- [x] `galpi check --human` 또는 `galpi explain errors`는 사람용 설명 출력.
+- [x] pre-commit에 `galpi check` 연결 (`.githooks/pre-commit` + `core.hooksPath`).
+  CI 연결은 저장소에 CI 인프라가 생길 때 수행.
 - [ ] Codex 환경에서 CLI 동작 확인 (리뷰 + 실행 테스트).
 - [ ] 오탐·미탐을 `docs/experiments/phase2-check.md`에 기록.
 

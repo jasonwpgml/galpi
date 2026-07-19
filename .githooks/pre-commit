@@ -1,0 +1,8 @@
+#!/bin/sh
+# Block commits that break the Galpi runtime contract (galpi-lab only).
+if git diff --cached --name-only | grep -q '^galpi-lab/'; then
+  (cd galpi-lab && npm run -s galpi -- check) || {
+    echo "galpi check failed - commit blocked (run: cd galpi-lab && npm run galpi -- check --human)" >&2
+    exit 1
+  }
+fi

@@ -1,5 +1,34 @@
 # Handoff (최신이 맨 위)
 
+## 2026-07-19 claude (4) — Phase 2 core landed (check/doctor/mutations/hook gating)
+
+- Human decisions recorded: C3 adopted as the GALPI/1 standard grammar; Phase 2 entry
+  approved. Phase 1.5 closed (see roadmap gate memo).
+- Done:
+  - Live `.galpi` runtime migrated to C3 grammar (BOOT behaviors, lg.import view).
+  - `tools/galpi/` CLI (`npm run galpi -- <cmd>`): `check` (schema, dup ids, states,
+    refs, view/MAP desync, plan_has_code, dead_import, verified-hash stale,
+    lock_modified; `--ai` default / `--human`), `doctor` (ambiguous names, large/mixed
+    files, deep imports, far tests, missing_anchor via view constraint links),
+    mutations `set-state|add-route|rm-route|add-task|add-domain` (validate, write,
+    re-check, rollback on failure; MAP + view states resynced).
+  - PreToolUse hook `tools/galpi/hooks/pretooluse.mjs` + `.claude/settings.json`:
+    denies Write/Edit on DEAD/LOCK domain paths and derived artifacts (exit 2).
+  - Pre-commit: `.githooks/pre-commit` runs `galpi check` when galpi-lab is staged;
+    `core.hooksPath=.githooks` set locally.
+  - False-positive log started: `docs/experiments/phase2-check.md` (2 doctor
+    heuristics tightened during bring-up).
+- Verification ledger:
+  - target: `tools/galpi/**` | check: `tsx --test tools/galpi/galpi.test.ts` 8/8 pass,
+    `npm run check` (typecheck + 12 app tests + galpi check + build) green
+  - target: hook | check: manual stdin probes — dead path exit 2, derived exit 2,
+    normal path exit 0
+  - target: live runtime | check: `galpi check` OK|errors=0, `galpi doctor` findings=0
+- Next (Codex): review `tools/galpi/**` (diff-scoped per ledger rules) and run the CLI
+  in a Codex session (roadmap item "Codex 환경에서 CLI 동작 확인").
+- Remaining Phase 2 items: multi-file fixture scenario design; CI wiring (no CI infra
+  in repo yet); ongoing false-positive/negative logging.
+
 ## 2026-07-19 claude (3) — Codex-side C3 re-measurement complete; gate synthesis ready
 
 (English per the v3 §5 language policy adopted today.)

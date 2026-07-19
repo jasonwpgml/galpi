@@ -1,9 +1,10 @@
 G|1|manual
 T|lg.import|4|q=legacy_comma_roster_import|e=y30|f=f30,f31|x=-|p=-|a=4
+B|dead:do_not_open_f30_f31;no_grep_src/legacy
+B|new_work:read_replacement_links_only;target=src/student
+L|replacement=.galpi/v/d/st.gp,.galpi/v/t/st.list.gp
 F|f30|src/legacy/legacy.service.csv-import.ts
 F|f31|src/legacy/index.ts
 Y|y30|parseLegacyRoster|f30|t=lg.import
 L|v=v/t/lg.import.gp
 L|rule=deny_read_reuse_modify
-L|replacement=.galpi/v/d/st.gp,.galpi/v/t/st.list.gp
-L|new=read_replacement_only;deny=f30,f31
