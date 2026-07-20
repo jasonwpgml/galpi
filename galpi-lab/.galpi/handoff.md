@@ -1,5 +1,37 @@
 # Handoff (최신이 맨 위)
 
+## 2026-07-19 claude (5) — C4 hook-gating re-measurement; multi-file scenario design landed
+
+- Done:
+  - Committed prior session's leftover work: `docs/experiments/phase2-multifile-design.md`
+    (MF1-MF4 scenarios) + roadmap tick (commit `2360c8b`).
+  - Full Claude C4 batch completed: retried the 18 usage-limit-excluded runs from
+    `claude-c4-1` via `--retry-excluded`; batch now 45/45 valid.
+  - Analysis written: `docs/experiments/phase1-claude.md` "C4 훅 게이팅 재측정" section.
+    Headline: C3's only remaining deficit (Claude total tokens +12.1% vs B) shrank to
+    +1.9%, with ET and cost flipping to a net win (-1.3%/-2.8%) and route/state
+    compliance improving further (+26.7pp vs B, up from C3's +20pp). Strict gate still
+    `acceptsC: false` (3 near-miss axes: total tokens, first-relevant-command,
+    unrelated-reads), but the deficit shrank ~6x — no impact on the already-approved
+    Phase 2 entry decision.
+  - Anomaly logged (not yet investigated): login scenario route/state regressed
+    67%→33% in C4 vs C3, single scenario, n=3 — flagged in report as low priority,
+    revisit if the pattern repeats in Phase 3.5 messy-fixture runs.
+  - Roadmap v3 and this handoff updated with the result.
+- Verification ledger:
+  - target: `phase1-ai/fixture-c4` (`b6b8c20`) | check: `git ls-tree -r` on
+    src/docs/plans/package/tsconfig against fixture-c3 — byte-identical | evidence: no
+    diff output | hash: `b6b8c201f51fa24a7809caeebab91b3314249555`
+  - target: `scripts/phase1-ai-first-runner.mjs` (C label bump to C4) | check:
+    `--validate-only --agent=claude` → VALID | evidence: stdout
+  - target: `claude-c4-1` batch | check: 45/45 valid, 0 excluded after retry | evidence:
+    `aggregate.json` validity block
+- Next: no blocking follow-up from this measurement. Remaining Phase 2 items unchanged
+  from prior handoff: Codex-side CLI review/run, ongoing false-positive/negative
+  logging in `docs/experiments/phase2-check.md`. Phase 3.5 (messy fixture) is the next
+  substantial phase and will fold in the MF1-MF4 multi-file scenarios per
+  `docs/experiments/phase2-multifile-design.md`.
+
 ## 2026-07-19 claude (4) — Phase 2 core landed (check/doctor/mutations/hook gating)
 
 - Human decisions recorded: C3 adopted as the GALPI/1 standard grammar; Phase 2 entry
