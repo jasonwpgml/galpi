@@ -537,6 +537,14 @@ src/
 - [x] **PreToolUse 훅 게이팅**: 에이전트 래퍼(Claude Code hooks 등)에서 `.galpi` 상태 파서를
   재사용해 DEAD(4)·LOCK(l) 경로에 대한 write/edit 도구 호출을 셸 단에서 거부.
   상태 규약을 프롬프트 추종이 아니라 물리적으로 강제한다 (SWE-agent ACI의 린터 게이트 준용).
+- [x] **훅 게이팅 적용 상태에서 Claude 재측정** (Phase 1.5 남은 결손 검증):
+  C4 fixture(`phase1-ai/fixture-c4` = `b6b8c20`, C3에서 프롬프트 sync 지시 제거 + 훅
+  이식), `claude-c4-1` 45/45 유효. 결과: C3의 토큰 열세가 +12.1%→+1.9%로 축소, ET·비용은
+  부호 반전(-1.3%/-2.8%, B보다 쌈), route/state는 오히려 +26.7%p로 개선. 엄격 게이트는
+  여전히 `acceptsC: false`(총 토큰·최초 도달·관련없는 읽기 3개 항목 근소 미달)이나 결손
+  규모가 1/6로 축소 — Phase 2 진입 판단(이미 사람 승인 완료)에는 영향 없음. login
+  시나리오 단독 역행(route/state 67%→33%) 관찰, 재현성은 후순위. 상세:
+  `docs/experiments/phase1-claude.md` "C4 훅 게이팅 재측정" 섹션.
 - [x] (실험 설계) 더 큰 fixture 재측정에 3개 파일 이상을 고치는 multi-file 변경 시나리오 포함.
   구조 인덱스의 정확도 이득이 multi-file 변경에서 최대라는 외부 실증 반영
   (`docs/plans/external-review-2026-07.md` 참조).
