@@ -537,9 +537,11 @@ src/
 - [x] **PreToolUse 훅 게이팅**: 에이전트 래퍼(Claude Code hooks 등)에서 `.galpi` 상태 파서를
   재사용해 DEAD(4)·LOCK(l) 경로에 대한 write/edit 도구 호출을 셸 단에서 거부.
   상태 규약을 프롬프트 추종이 아니라 물리적으로 강제한다 (SWE-agent ACI의 린터 게이트 준용).
-- [ ] (실험 설계) 더 큰 fixture 재측정에 3개 파일 이상을 고치는 multi-file 변경 시나리오 포함.
+- [x] (실험 설계) 더 큰 fixture 재측정에 3개 파일 이상을 고치는 multi-file 변경 시나리오 포함.
   구조 인덱스의 정확도 이득이 multi-file 변경에서 최대라는 외부 실증 반영
   (`docs/plans/external-review-2026-07.md` 참조).
+  → 설계 완료: `docs/experiments/phase2-multifile-design.md` (MF1~MF4, 완전성·선회
+  지표 추가, Phase 3.5 messy fixture 측정에 통합 실행).
 - [x] `galpi check --ai`는 compact 오류 패킷 출력. (`--ai`가 기본값)
 - [x] `galpi check --human` 또는 `galpi explain errors`는 사람용 설명 출력.
 - [x] pre-commit에 `galpi check` 연결 (`.githooks/pre-commit` + `core.hooksPath`).
