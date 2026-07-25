@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -217,6 +217,17 @@ function checkMap(runtime: Runtime, errors: CheckError[]): void {
   }
 }
 
+// AIDEV-NOTE: PLAN domains must be empty at any depth -- a top-level-only scan let
+// code hide under src/<plan>/sub/, which is exactly how a plan domain silently grows
+// an implementation.
+function containsFile(dir: string): boolean {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isFile()) return true;
+    if (entry.isDirectory() && containsFile(path.join(dir, entry.name))) return true;
+  }
+  return false;
+}
+
 function checkPlanAndDead(runtime: Runtime, errors: CheckError[]): void {
   const sourceFile = rel(runtime, runtime.source.path);
   const deadDomains = runtime.domains.filter((domain) => parseState(domain.state)?.code === "4");
@@ -224,7 +235,7 @@ function checkPlanAndDead(runtime: Runtime, errors: CheckError[]): void {
   for (const domain of runtime.domains) {
     if (parseState(domain.state)?.code !== "2" || domain.path === "-") continue;
     const dir = path.join(runtime.root, domain.path);
-    if (existsSync(dir) && readdirSync(dir).some((entry) => statSync(path.join(dir, entry)).isFile())) {
+    if (existsSync(dir) && containsFile(dir)) {
       err(errors, "plan_has_code", sourceFile, { d: domain.id, path: domain.path }, domain.record.line);
     }
   }

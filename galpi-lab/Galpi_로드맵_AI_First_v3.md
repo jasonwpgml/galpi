@@ -554,8 +554,13 @@ src/
 - [x] `galpi check --human` 또는 `galpi explain errors`는 사람용 설명 출력.
 - [x] pre-commit에 `galpi check` 연결 (`.githooks/pre-commit` + `core.hooksPath`).
   CI 연결은 저장소에 CI 인프라가 생길 때 수행.
-- [ ] Codex 환경에서 CLI 동작 확인 (리뷰 + 실행 테스트).
-- [ ] 오탐·미탐을 `docs/experiments/phase2-check.md`에 기록.
+- [x] Codex 환경에서 CLI 동작 확인 (리뷰 + 실행 테스트). (2026-07-25, `docs/worklog/codex.md`)
+  Codex 판정 `ACCEPT WITH FINDINGS`: 런타임 스모크 10/10 PASS(check/check --human/doctor/
+  set-state·add-route·rm-route 왕복 후 tree clean, DEAD 훅 프로브 exit 2), med 3건 지적.
+  3건 모두 수정 완료 — 변형 롤백 범위를 파생물 전체 스냅샷으로 확대, `plan_has_code`
+  재귀 탐색, 훅 대소문자 우회 차단. 회귀 테스트 2건 추가(15/15 pass).
+- [x] 오탐·미탐을 `docs/experiments/phase2-check.md`에 기록.
+  (오탐 2건 — bring-up 중 휴리스틱 조정 / 미탐 2건 — Codex 지적 #2·#3)
 
 오류 패킷 예시:
 

@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { spawnSync } from "node:child_process";
 
 import { parseGp } from "./gp.ts";
 import { runCheck } from "./check.ts";
@@ -195,6 +196,35 @@ test("doctor flags ambiguous names, deep imports, and far tests", () => {
     assert.ok(kinds.includes("ambiguous_name"));
     assert.ok(kinds.includes("deep_import"));
     assert.ok(kinds.includes("test_far_from_code"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("plan_has_code detects code nested below a PLAN domain", () => {
+  const root = makeFixture();
+  try {
+    write(root, ".galpi/source.gp", readFileSync(path.join(root, ".galpi/source.gp"), "utf8")
+      .replace("D|b|2|-|a=2", "D|b|2|src/billing|a=2"));
+    write(root, "src/billing/nested/deep/invoice.ts", "export const invoice = 1;\n");
+    const kinds = runCheck(root, { git: false }).map((error) => error.kind);
+    assert.ok(kinds.includes("plan_has_code"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("hook denies DEAD paths that differ only by case", () => {
+  const root = makeFixture();
+  try {
+    const hook = path.resolve("tools/galpi/hooks/pretooluse.mjs");
+    const payload = JSON.stringify({
+      tool_name: "Edit",
+      tool_input: { file_path: "SRC/LEGACY/legacy.service.csv-import.ts" },
+    });
+    const result = spawnSync(process.execPath, [hook], { cwd: root, input: payload, encoding: "utf8" });
+    const expected = process.platform === "win32" || process.platform === "darwin" ? 2 : 0;
+    assert.equal(result.status, expected);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

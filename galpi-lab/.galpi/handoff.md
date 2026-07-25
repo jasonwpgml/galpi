@@ -1,5 +1,46 @@
 # Handoff (최신이 맨 위)
 
+## 2026-07-25 claude (6) — Phase 2 closed: Codex CLI review landed, 3 findings fixed
+
+- Done:
+  - Delegated the open Phase 2 item "Codex 환경에서 CLI 동작 확인" to a Codex session
+    (`codex exec`, diff-scoped per §6 rule 4, ledger items marked no-re-verify in the
+    prompt). Codex report: `docs/worklog/codex.md`, verdict `ACCEPT WITH FINDINGS`,
+    ~62k tokens for the whole review+smoke pass.
+  - Codex runtime smoke in a Codex environment: 10/10 PASS — check, check --human,
+    doctor, set-state/add-route/rm-route round-trip leaving `git status` empty, DEAD
+    hook probe `DENY|dead|d=lg` exit 2. This is the cross-environment proof the item
+    was asking for; the CLI is not Claude-session-dependent.
+  - Fixed all 3 med findings (I opened only the 3 flagged files, per §6 rules 4-5; the
+    review itself was not re-evaluated):
+    1. `mutate.ts` — rollback only restored `source.gp`, so a throw inside syncMap /
+       syncViewStates / runCheck could strand a mutated source with unsynced MAP/views.
+       Now snapshots source+MAP+views+status files before the first write and restores
+       on both validation failure and exception.
+    2. `check.ts` — `plan_has_code` scanned only the PLAN directory's immediate files;
+       code under `src/<plan>/sub/` was invisible. Now recursive (`containsFile`).
+    3. `hooks/pretooluse.mjs` — on case-insensitive filesystems `SRC/LEGACY/x.ts`
+       bypassed the DEAD/LOCK and derived-artifact compares. Now folds case on
+       win32/darwin for matching only; DENY packets keep the original spelling.
+  - Logged findings 2-3 as the first 미탐 entries in `docs/experiments/phase2-check.md`;
+    finding 1 recorded under 알려진 한계. Both Phase 2 checkboxes ticked.
+- Verification ledger:
+  - target: `tools/galpi/**` @ Codex review | check: diff-scoped code review + 10-command
+    runtime smoke in a Codex session | evidence: `docs/worklog/codex.md` (2026-07-25)
+    | hash: `b5edc97`
+  - target: `tools/galpi/{mutate,check}.ts`, `hooks/pretooluse.mjs` (post-fix) | check:
+    `npm run check` — typecheck + 15/15 tests + `galpi check` OK|errors=0 + build green
+    | evidence: run output. 2 new regression tests: nested `plan_has_code`, case-variant
+    DEAD hook denial.
+  - not verified: mutation rollback-on-throw has no test (needs fault injection); the
+    fix is by inspection only.
+- Next: Phase 2 checklist is fully ticked except CI wiring, which the roadmap defers
+  until CI infra exists (repo has an origin remote but no workflows). Phase 3.5 (messy
+  fixture, M0-M3 + the MF1-MF4 multi-file scenarios in
+  `docs/experiments/phase2-multifile-design.md`) is the next substantial phase.
+- 주의: the C4 login-scenario route/state regression (67%→33%, n=3) is still
+  uninvestigated by design — revisit only if it repeats in Phase 3.5.
+
 ## 2026-07-19 claude (5) — C4 hook-gating re-measurement; multi-file scenario design landed
 
 - Done:

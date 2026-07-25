@@ -28,7 +28,8 @@ DEAD(4)·LOCK(l) 도메인 경로와 파생물(MAP/manifest/v)을 exit 2로 거�
 
 | 날짜 | 검사 | 사례 | 조치 |
 |---|---|---|---|
-| (없음) | | | |
+| 2026-07-25 | `plan_has_code` | PLAN 도메인 디렉토리 **바로 아래** 파일만 봐서 `src/<plan>/sub/x.ts`처럼 하위 디렉토리에 숨은 코드를 놓침 | 재귀 탐색(`containsFile`)으로 변경. 회귀 테스트 추가 (Codex 리뷰 지적 #2) |
+| 2026-07-25 | 훅 `pretooluse.mjs` | Windows·macOS 등 대소문자 비구분 FS에서 `SRC/LEGACY/x.ts`가 DEAD/LOCK·파생물 비교를 우회 (같은 파일인데 exit 0) | 매칭 시 양쪽 case fold, DENY 패킷은 원문 유지. 회귀 테스트 추가 (Codex 리뷰 지적 #3) |
 
 ## 알려진 한계
 
@@ -38,4 +39,6 @@ DEAD(4)·LOCK(l) 도메인 경로와 파생물(MAP/manifest/v)을 exit 2로 거�
   working tree가 dirty하면 `got=dirty`로 보고한다.
 - 훅은 Write/Edit/NotebookEdit만 게이팅한다. Bash 경유 파일 수정은 pre-commit의
   `galpi check`가 2차로 잡는다 (lock_modified/dead_import).
+- 변형 커맨드 롤백은 source·MAP·view·status 파일의 바이트 스냅샷 복원이다 (2026-07-25,
+  Codex 리뷰 지적 #1). 검증 실패뿐 아니라 sync·check 도중 예외에도 복원한다.
 - CI 연결은 저장소에 CI 인프라가 생길 때 수행.
