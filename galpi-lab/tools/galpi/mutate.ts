@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { CheckError, runCheck } from "./check.ts";
@@ -13,6 +13,10 @@ export interface MutationResult {
 // AIDEV-NOTE: contract -- mutations never leave a half-written runtime: the edit
 // is applied in memory, re-validated via runCheck against the real tree only
 // after writing, and rolled back byte-for-byte when new errors appear.
+// AIDEV-NOTE: rollback must cover every derived file, not just source.gp -- syncMap,
+// syncViewStates and runCheck all write or parse after the source write, so a throw
+// there would otherwise strand a mutated source with unsynced MAP/views. The snapshot
+// is taken before the first write and restored on both validation failure and throw.
 function applySourceEdit(
   root: string,
   describe: string,
@@ -28,17 +32,44 @@ function applySourceEdit(
   }
   const baseline = runCheck(root, { git: false });
   const baselineKeys = new Set(baseline.map(errorKey));
-  writeFileSync(sourcePath, edited.join(newline), "utf8");
-  syncMap(root);
-  syncViewStates(root);
-  const after = runCheck(root, { git: false }).filter((error) => !baselineKeys.has(errorKey(error)));
-  if (after.length > 0) {
-    writeFileSync(sourcePath, before, "utf8");
+  const snapshot = snapshotRuntimeFiles(root);
+  try {
+    writeFileSync(sourcePath, edited.join(newline), "utf8");
     syncMap(root);
     syncViewStates(root);
-    return { ok: false, errors: after, message: `${describe}: rolled back (validation failed)` };
+    const after = runCheck(root, { git: false }).filter(
+      (error) => !baselineKeys.has(errorKey(error)),
+    );
+    if (after.length > 0) {
+      restoreSnapshot(snapshot);
+      return { ok: false, errors: after, message: `${describe}: rolled back (validation failed)` };
+    }
+    return { ok: true, errors: [], message: describe };
+  } catch (error) {
+    restoreSnapshot(snapshot);
+    throw error;
   }
-  return { ok: true, errors: [], message: describe };
+}
+
+/** Byte snapshot of every file a mutation can write: source, MAP, views, status files. */
+function snapshotRuntimeFiles(root: string): Map<string, string> {
+  const snapshot = new Map<string, string>();
+  const add = (file: string): void => {
+    if (!snapshot.has(file) && existsSync(file)) snapshot.set(file, readFileSync(file, "utf8"));
+  };
+  add(path.join(root, ".galpi", "source.gp"));
+  add(path.join(root, ".galpi", "MAP.gp"));
+  try {
+    const runtime = loadRuntime(root);
+    for (const view of [...runtime.views, ...runtime.statusFiles]) add(view.path);
+  } catch {
+    // An unloadable runtime still gets source/MAP protection; nothing else is writable.
+  }
+  return snapshot;
+}
+
+function restoreSnapshot(snapshot: Map<string, string>): void {
+  for (const [file, content] of snapshot) writeFileSync(file, content, "utf8");
 }
 
 function errorKey(error: CheckError): string {

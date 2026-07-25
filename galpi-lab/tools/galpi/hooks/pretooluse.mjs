@@ -38,8 +38,19 @@ const root = process.cwd();
 const rel = path.relative(root, path.resolve(root, target)).replaceAll("\\", "/");
 if (rel.startsWith("..")) process.exit(0); // outside this project
 
+// AIDEV-NOTE: on case-insensitive filesystems `SRC/LEGACY/x.ts` and `src/legacy/x.ts`
+// are the same file, so a case-sensitive compare here is a gate bypass. Fold both
+// sides for matching only; DENY packets keep the caller's original spelling.
+const caseInsensitiveFs = process.platform === "win32" || process.platform === "darwin";
+const fold = (value) => (caseInsensitiveFs ? value.toLowerCase() : value);
+const relKey = fold(rel);
+
 // Derived runtime artifacts are never edited directly (N|MAP_manifest_v=derived_no_edit).
-if (rel === ".galpi/MAP.gp" || rel === ".galpi/manifest.gp" || rel.startsWith(".galpi/v/")) {
+if (
+  relKey === fold(".galpi/MAP.gp") ||
+  relKey === fold(".galpi/manifest.gp") ||
+  relKey.startsWith(fold(".galpi/v/"))
+) {
   deny(
     `DENY|derived|path=${rel}`,
     "Derived Galpi artifact. Edit .galpi/source.gp via `npm run galpi -- <command>`; MAP/views are regenerated.",
@@ -59,7 +70,8 @@ const domains = readFileSync(sourcePath, "utf8")
   .filter((domain) => domain.path && domain.path !== "-");
 
 for (const domain of domains) {
-  const inside = rel === domain.path || rel.startsWith(`${domain.path}/`);
+  const domainKey = fold(domain.path);
+  const inside = relKey === domainKey || relKey.startsWith(`${domainKey}/`);
   if (!inside) continue;
   if (domain.state.startsWith("4")) {
     deny(
