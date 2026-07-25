@@ -1,5 +1,33 @@
 # Handoff (최신이 맨 위)
 
+## 2026-07-25 claude (7) — CI wired; latent stale false-positive fixed
+
+- Done:
+  - `.github/workflows/check.yml` (repo root, since the git root is the monorepo parent):
+    push to main + PR → `npm ci && npm run check` (typecheck, 15 tests, `galpi check`,
+    build) with `working-directory: galpi-lab`, npm cache keyed on
+    `galpi-lab/package-lock.json`, plus a non-blocking `galpi doctor` step. This closes
+    the last open Phase 2 checkbox — the roadmap had deferred it "until CI infra exists".
+  - Fixed a latent false positive found while wiring it: `checkGitState` ran
+    `git rev-parse HEAD:<domain.path>`, which git resolves from the **repo root**, while
+    domain paths are relative to the Galpi root (`galpi-lab/`). Any domain carrying a
+    `verified=` field would have reported `stale|got=?` forever. Now `HEAD:./<path>`.
+    Dormant until now only because no domain uses `verified=` yet.
+- Verification ledger:
+  - target: `.github/workflows/check.yml` | check: YAML parses (5 steps, keys as
+    expected); `npm ci --dry-run` confirms the lockfile is in sync | evidence: run output
+  - target: `check.ts` git-path fix | check: injected
+    `verified=515ffd4c...` on domain `a` in a scratch copy of source.gp → `OK|errors=0`
+    (pre-fix this path yields `stale|got=?`); source.gp restored, `git status` clean
+  - target: full gate | check: `npm run check` green — typecheck + 15/15 + build
+  - **not verified**: the workflow has never executed. It is unverified until the branch
+    is pushed (local branch is 16 commits ahead of origin; no push made). CI runs on
+    Node 20 (the `engines` floor) while this machine runs Node 24 — first run may surface
+    version drift.
+- Next: Phase 2 is fully closed. Phase 3.5 (messy fixture M0-M3 + the MF1-MF4 multi-file
+  scenarios) is the next substantial phase; note its measurement batches are a cross-agent
+  gate, so the ledger's no-re-verify rule does not apply to them (§6 rule 6).
+
 ## 2026-07-25 claude (6) — Phase 2 closed: Codex CLI review landed, 3 findings fixed
 
 - Done:

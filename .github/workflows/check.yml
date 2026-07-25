@@ -1,0 +1,37 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same ref makes the running job pointless.
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: galpi-lab
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: galpi-lab/package-lock.json
+
+      - run: npm ci
+
+      # typecheck + tests + galpi check + build (same gate as .githooks/pre-commit)
+      - run: npm run check
+
+      # Structural diagnostics are advisory: doctor always exits 0, so this step
+      # surfaces findings in the log without failing the build.
+      - name: galpi doctor (advisory)
+        run: npm run galpi -- doctor

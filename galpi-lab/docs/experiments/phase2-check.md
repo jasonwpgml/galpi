@@ -23,6 +23,7 @@ DEAD(4)·LOCK(l) 도메인 경로와 파생물(MAP/manifest/v)을 exit 2로 거�
 |---|---|---|---|
 | 2026-07-19 | `test_far_from_code` | 자기 도메인 코드 + `shared/index`를 함께 import하는 정상 테스트 3건을 과탐 | 휴리스틱 변경: 자기 디렉토리 import가 0건일 때만 보고 |
 | 2026-07-19 | `missing_anchor` | 앵커가 쿼리 파일에 있는데 types/index 파일을 개별 과탐 | task 단위 판정으로 변경: 구현 파일 중 어디에도 앵커가 없을 때만 보고 |
+| 2026-07-25 | `stale` | Galpi 루트가 저장소 루트의 하위 디렉토리일 때(`galpi-lab/`) `git rev-parse HEAD:<domain.path>`가 저장소 루트 기준으로 풀려 `verified=` 도메인을 전부 stale로 과탐. 현재 `verified=` 사용 도메인이 없어 잠복 상태였음 | `HEAD:./<path>`로 cwd 기준 해석. CI 연동 중 발견, 임시 `verified=` 주입으로 재현·확인 |
 
 ## 미탐 기록
 

@@ -553,7 +553,11 @@ src/
 - [x] `galpi check --ai`는 compact 오류 패킷 출력. (`--ai`가 기본값)
 - [x] `galpi check --human` 또는 `galpi explain errors`는 사람용 설명 출력.
 - [x] pre-commit에 `galpi check` 연결 (`.githooks/pre-commit` + `core.hooksPath`).
-  CI 연결은 저장소에 CI 인프라가 생길 때 수행.
+- [x] CI 연결 (2026-07-25): `.github/workflows/check.yml` — push(main)·PR에서
+  `npm ci && npm run check`(typecheck + tests + `galpi check` + build), `galpi doctor`는
+  참고용 비차단 스텝. 모노레포라 `working-directory: galpi-lab`.
+  연동 중 발견·수정: `checkGitState`의 `HEAD:<path>`가 저장소 루트 기준으로 풀려
+  Galpi 루트가 하위 디렉토리면 `verified=` 도메인이 항상 stale로 오탐 → `HEAD:./<path>`.
 - [x] Codex 환경에서 CLI 동작 확인 (리뷰 + 실행 테스트). (2026-07-25, `docs/worklog/codex.md`)
   Codex 판정 `ACCEPT WITH FINDINGS`: 런타임 스모크 10/10 PASS(check/check --human/doctor/
   set-state·add-route·rm-route 왕복 후 tree clean, DEAD 훅 프로브 exit 2), med 3건 지적.
