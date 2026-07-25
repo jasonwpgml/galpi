@@ -268,7 +268,10 @@ function checkGitState(runtime: Runtime, errors: CheckError[]): void {
     const verified = domain.kv.get("verified");
     if (verified) {
       const dirty = git(runtime, ["status", "--porcelain", "--", domain.path]);
-      const head = git(runtime, ["rev-parse", `HEAD:${domain.path}`]);
+      // AIDEV-NOTE: `HEAD:path` resolves from the repo root, but the Galpi root can be a
+      // subdirectory of it (this repo: galpi-lab/). The `./` prefix makes it cwd-relative,
+      // which is what domain paths are. Without it every `verified=` domain reports stale.
+      const head = git(runtime, ["rev-parse", `HEAD:./${domain.path}`]);
       const current = dirty.stdout.trim() !== "" ? "dirty" : head.stdout.trim();
       if (!head.ok || current !== verified) {
         // AIDEV-NOTE: a verified-hash mismatch demotes the domain to STALE (5) at
