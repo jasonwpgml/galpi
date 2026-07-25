@@ -5,12 +5,24 @@ import { formatAi, formatHuman, runCheck } from "./check.ts";
 import { formatDoctorAi, formatDoctorHuman, runDoctor } from "./doctor.ts";
 import { addDomain, addRoute, addTask, rmRoute, setState } from "./mutate.ts";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const SELF_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+// AIDEV-NOTE: `--root <path>` lets the CLI inspect a tree other than its own checkout,
+// which Phase 3.5 needs to run doctor against the messy fixtures. Without it galpi can
+// only ever diagnose the repository it ships in.
+function resolveRoot(rest: string[]): string {
+  const index = rest.indexOf("--root");
+  const value = index >= 0 ? rest[index + 1] : process.env.GALPI_ROOT;
+  return value ? path.resolve(value) : SELF_ROOT;
+}
 
 function main(argv: string[]): number {
   const [command, ...rest] = argv;
-  const flags = new Set(rest.filter((arg) => arg.startsWith("--")));
-  const args = rest.filter((arg) => !arg.startsWith("--"));
+  const ROOT = resolveRoot(rest);
+  const rootIndex = rest.indexOf("--root");
+  const positional = rootIndex >= 0 ? rest.filter((_, i) => i !== rootIndex && i !== rootIndex + 1) : rest;
+  const flags = new Set(positional.filter((arg) => arg.startsWith("--")));
+  const args = positional.filter((arg) => !arg.startsWith("--"));
   const human = flags.has("--human");
 
   switch (command) {
@@ -29,7 +41,7 @@ function main(argv: string[]): number {
     case "rm-route":
     case "add-task":
     case "add-domain": {
-      const result = runMutation(command, args);
+      const result = runMutation(ROOT, command, args);
       if (result.ok) {
         console.log(`OK|${result.message.replaceAll(" ", "_")}`);
         return 0;
@@ -40,7 +52,7 @@ function main(argv: string[]): number {
     default:
       console.error(
         [
-          "usage: galpi <command> [args] [--ai|--human] [--no-git]",
+          "usage: galpi <command> [args] [--root <path>] [--ai|--human] [--no-git]",
           "  check                              validate runtime vs code",
           "  doctor                             read-only structure diagnosis",
           "  set-state <id> <state>             change a D/T state in source.gp",
@@ -54,7 +66,7 @@ function main(argv: string[]): number {
   }
 }
 
-function runMutation(command: string, args: string[]) {
+function runMutation(ROOT: string, command: string, args: string[]) {
   switch (command) {
     case "set-state":
       return setState(ROOT, args[0] ?? "", args[1] ?? "");

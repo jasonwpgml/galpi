@@ -229,3 +229,20 @@ test("hook denies DEAD paths that differ only by case", () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("cli --root inspects a tree other than its own checkout", () => {
+  const root = makeFixture();
+  try {
+    write(root, "src/auth/utils.ts", "export const util = 1;\n");
+    const cli = path.resolve("tools/galpi/cli.ts");
+    const tsx = path.resolve("node_modules/tsx/dist/cli.mjs");
+    const result = spawnSync(process.execPath, [tsx, cli, "doctor", "--root", root], {
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /ambiguous_name/);
+    assert.match(result.stdout, /src\/auth\/utils\.ts/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
