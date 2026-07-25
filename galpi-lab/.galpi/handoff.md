@@ -20,10 +20,11 @@
     `verified=515ffd4c...` on domain `a` in a scratch copy of source.gp → `OK|errors=0`
     (pre-fix this path yields `stale|got=?`); source.gp restored, `git status` clean
   - target: full gate | check: `npm run check` green — typecheck + 15/15 + build
-  - **not verified**: the workflow has never executed. It is unverified until the branch
-    is pushed (local branch is 16 commits ahead of origin; no push made). CI runs on
-    Node 20 (the `engines` floor) while this machine runs Node 24 — first run may surface
-    version drift.
+  - target: the workflow end-to-end | check: pushed main to origin (17 commits,
+    `92fdcaf..f30a862`) and the run executed | evidence: run `30147431597` SUCCESS in 22s,
+    every step green including `npm ci`, `npm run check`, advisory doctor. No Node 20 vs 24
+    drift appeared. Follow-up run `30147472298` green after bumping checkout/setup-node to
+    v7 (the v4 pins raised a deprecated-action-runtime warning); annotations now clean.
 - Next: Phase 2 is fully closed. Phase 3.5 (messy fixture M0-M3 + the MF1-MF4 multi-file
   scenarios) is the next substantial phase; note its measurement batches are a cross-agent
   gate, so the ledger's no-re-verify rule does not apply to them (§6 rule 6).
