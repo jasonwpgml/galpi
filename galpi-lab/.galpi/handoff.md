@@ -1,5 +1,54 @@
 # Handoff (최신이 맨 위)
 
+## 2026-07-26 claude (8) — Phase 3.5 Stage A: both fixtures built, batch not yet run
+
+Human decision recorded: staged Phase 3.5 approved — Stage A (M0 vs M2, Claude only,
+4 scenarios x 3 reps = 24 runs, ~$8) acts as a funding gate for the full 2x2 Stage B.
+Stage A is explicitly NOT an adoption decision (constitution art. 10 bars single-agent
+adoption); it only decides whether Stage B is worth paying for.
+
+- Done:
+  - `phase35/fixture-m0` (`4d468a5`) — messy fixture, 12 files / 1251 lines, derived
+    mechanically from `origin/phase1-ai/fixture-a` so behaviour is identical by
+    construction. Ambiguous basenames (core, utils, manager, data, helpers, stuff), a
+    334-line god object holding three domains, all repositories in one file, no domain
+    barrels, every test in one far-away file. `extra/` adds ~390 lines of plausible but
+    scenario-irrelevant code (attendance, notifications, reporting) because a 712-line
+    repo is cheap enough to read wholesale, which would mask the irrelevant-reads and
+    context-token differences this phase exists to measure.
+  - `galpi doctor --root` added to the CLI (`526eee0`) — ROOT was pinned to the CLI's own
+    checkout, so galpi could not diagnose any tree but its own. Regression test included.
+  - M0 diagnosis recorded as `docs/experiments/phase35-m0-doctor.md`: **30 findings**
+    (6 ambiguous_name, 1 large_mixed_file, 22 deep_import, 1 test_far_from_code). This
+    file is the transform spec for M2 — the roadmap bans arbitrary improvement.
+  - `phase35/fixture-m2` (`18dc66f`) — M0 with those 30 findings fixed and nothing else.
+    Doctor now reports **0 findings**. Same four test assertions pass; demo output matches.
+  - Control constraint: both trees expose an identical public entry `src/index.ts`
+    (7 runtime exports, 15 types, verified by a type-level probe in each tree), so one
+    hidden evaluator can grade both conditions. Without it the trees would differ in
+    import paths and the comparison would be uncontrolled.
+- Observation worth keeping: applying doctor's rules mechanically reproduces the
+  hand-designed layout of the clean Phase 1 fixture rather than inventing a third
+  arrangement. Weak evidence that the heuristics encode something real, but it also
+  means M2 is close to a structure a human already optimised — read the eventual effect
+  size with that in mind.
+- Verification ledger:
+  - target: `phase35/fixture-m0` (`4d468a5`) | check: typecheck clean, 4/4 tests pass,
+    demo runs | evidence: run output
+  - target: `phase35/fixture-m2` (`18dc66f`) | check: typecheck clean, same 4/4 tests,
+    demo output matches, `galpi doctor --root` = 0 findings (was 30) | evidence: run output
+  - target: M0/M2 public surface parity | check: runtime export list identical; 15-type
+    probe compiles in both trees | evidence: run output
+  - target: `tools/galpi/cli.ts --root` | check: `npm run check` green, 16/16 tests
+- Next (this stage, not started): wire the runner — add M0/M2 conditions (both
+  bootstrapFiles: [], since neither carries Galpi), add 4 scenarios (2 carried from
+  Phase 1 + MF1 + MF3 from `docs/experiments/phase2-multifile-design.md`) with
+  evaluators importing only from `src/index.ts`, add the completeness metric the MF
+  design doc calls for, then run 24 runs and write `docs/experiments/phase35-structure.md`.
+- 주의: scenario picks for the carried pair are `sorting` (largest Phase 1 token spread,
+  43%) and `session-flow` (pure navigation, cheapest). `roster` was dropped for Stage A —
+  its prompt leans on Galpi state rules that do not exist in a Galpi-free condition.
+
 ## 2026-07-25 claude (7) — CI wired; latent stale false-positive fixed
 
 - Done:
