@@ -16,3 +16,21 @@ npm run demo
 
 에이전트 런타임은 `.galpi/BOOT.gp`에서 시작한다. 상태·route·의도의 원본은
 `.galpi/source.gp`이며 `MAP.gp`와 `.galpi/v/`는 파생 탐색 자료다.
+
+`.galpi`를 직접 편집하지 않는다. 상태·route 변경은 CLI로 한다.
+
+```bash
+npm run galpi -- check     # 런타임 계약 검증 (pre-commit·CI와 동일 게이트)
+npm run galpi -- doctor    # 구조 진단 (읽기 전용, --root <path>로 외부 트리도 가능)
+```
+
+## 문서
+
+| 경로 | 내용 |
+|---|---|
+| `docs/roadmap.md` | 현행 로드맵 (AI-First Revision v3) — 헌법, Phase 계획, 성공 기준 |
+| `docs/experiments/` | Phase별 측정 보고서와 실험 설계 |
+| `docs/plans/` | 기능 계획서 |
+| `docs/worklog/` | 에이전트별 작업 기록 (Codex 리뷰 등) |
+| `docs/roadmap-history/` | 폐기된 로드맵 초안 (기록용) |
+| `.galpi/handoff.md` | 세션 간 인계 — 완료·검증됨·다음 할 일 |

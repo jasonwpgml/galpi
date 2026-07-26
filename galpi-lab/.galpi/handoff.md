@@ -1,5 +1,41 @@
 # Handoff (최신이 맨 위)
 
+## 2026-07-26 claude (9) — Phase 4.5 신설, 효율화 수단 우선순위 결정, 문서 정리
+
+- Human decisions recorded:
+  - 지시문 계층(프롬프트·규칙)의 토큰 최적화를 프로젝트 범위에 포함한다.
+  - 효율화 수단(훅·스킬·프롬프트 엔지니어링·LangChain/LangGraph)을 최대한 활용하되,
+    아래 우선순위대로 **하나씩** 도입한다.
+- Done:
+  - **Phase 4.5 신설** (`docs/roadmap.md`): 헌법 4조(점진적 공개)가 코드·인덱스에만
+    적용돼 있고 지시문 계층은 매 세션 전량 상주한다는 공백을 다룬다. 핵심 제약은
+    "본문은 미뤄도 트리거는 못 미룬다" — 파일을 안 읽은 에이전트는 정보 부재를 알지만,
+    규칙을 안 읽은 에이전트는 그 규칙의 존재를 몰라 자신 있게 위반한다. 커널에는
+    규칙당 트리거 한 줄이 상주해야 한다.
+  - 규칙 3분기 확정: 기계 강제 가능 → 훅으로 옮기고 프롬프트에서 삭제(C4 실증) /
+    강제 불가+항상 필요 → 커널 상주 / 강제 불가+조건부 → 블록화. 블록화는 셋 중 하나일 뿐.
+  - 현 `BOOT.gp`는 블록화 대상에서 명시적으로 제외 — 33줄에 `B|` 규칙이 이미 한 줄이라
+    미룰 본문이 없고, 왕복 호출만 늘어난다.
+  - 메커니즘 우선순위 표 기록: (1) 훅 확장 (2) Claude 스킬을 규칙 블록 로더로 바인딩
+    (3) 프롬프트 변형 C5 (4) LangGraph 레퍼런스 소비자.
+  - **LangChain/LangGraph는 측정 하네스에 넣지 않기로 결정.** 러너가 `claude.exe`/
+    `codex.exe`를 실제 CLI 그대로 구동하는 것이 측정의 전제이고, 프레임워크로 감싸면
+    측정 대상이 바뀌어 누적 배치(C2/C3/C4, codex-c3)와 비교 가능성이 끊긴다. Phase 5의
+    3rd-agent 레퍼런스 소비자로만 쓴다.
+  - 문서 정리: 루트에 홀로 있던 `Galpi_로드맵_AI_First_v3.md` → **`docs/roadmap.md`**
+    (버전 중립 경로 — v4는 같은 파일을 개정하고 링크는 유지된다). README에 문서 지도와
+    galpi CLI 사용법 추가. `docs/roadmap-history/README.md` 포인터 갱신.
+- Verification ledger:
+  - target: 문서 이동 후 런타임 | check: `galpi check` OK|errors=0, `galpi doctor`
+    findings=0 | evidence: 실행 출력
+  - not verified: Phase 4.5는 설계만 기록됐고 아무것도 구현·측정되지 않았다.
+    첫 체크리스트 항목이 "상주 비용 실측 먼저"이고, 비용이 작으면 이 Phase를 기각한다.
+- 주의: `handoff.md`의 2026-07-19 항목에 남은 `Galpi_로드맵_AI_First_v3.md` 경로는
+  당시 사실의 로그이므로 고치지 않는다. 현행 경로는 `docs/roadmap.md`.
+- Next: Phase 3.5 Stage A 잔여 — 러너 배선(M0/M2 조건, 시나리오 4개, 완전성 지표) →
+  스모크 → 24런 → `docs/experiments/phase35-structure.md`. fixture 설계 3가지
+  (고정 진입점 / 무관 코드 390줄 / `roster` 제외)에 대한 사람 확인은 아직 대기 중.
+
 ## 2026-07-26 claude (8) — Phase 3.5 Stage A: both fixtures built, batch not yet run
 
 Human decision recorded: staged Phase 3.5 approved — Stage A (M0 vs M2, Claude only,
