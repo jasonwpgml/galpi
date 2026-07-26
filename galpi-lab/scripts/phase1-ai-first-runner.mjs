@@ -401,6 +401,10 @@ console.log("hidden-m-sorting: PASS");
       M2: ["src/auth/"],
     },
     allowedPrefixes: [],
+    answerPaths: {
+      M0: ["src/app/manager.ts", "src/test/all.test.ts"],
+      M2: ["src/auth/auth.command.login.ts", "src/auth/auth.test.login.ts"],
+    },
     readOnly: true,
   },
 
@@ -1032,8 +1036,20 @@ function allowedChange(file, scenario, condition) {
   return false;
 }
 
-function semanticEvaluation(scenarioId, finalAnswer, changed) {
+function semanticEvaluation(scenarioId, scenario, condition, finalAnswer, changed) {
   const text = finalAnswer.toLowerCase();
+  // AIDEV-NOTE: read-only scenarios are graded on the paths the answer must cite. Those
+  // paths differ per condition in Phase 3.5 (the same login code is app/manager.ts in M0
+  // and auth/auth.command.login.ts in M2), so they live on the scenario as data rather
+  // than as another scenarioId branch here.
+  const answerPaths = prefixesFor(scenario, condition, "answerPaths");
+  if (answerPaths.length) {
+    const checks = Object.fromEntries(
+      answerPaths.map((file) => [file, text.includes(file.toLowerCase())]),
+    );
+    checks.noChanges = changed.length === 0;
+    return { passed: Object.values(checks).every(Boolean), checks };
+  }
   if (scenarioId === "billing") {
     const checks = {
       noImplementation:
@@ -1314,7 +1330,7 @@ async function runOne({
   );
   const queryResult = await countTokenFiles(
     runDir,
-    scenario.queryFiles[condition] ?? [],
+    scenario.queryFiles?.[condition] ?? [],
     encoder,
   );
   const cli =
@@ -1338,7 +1354,7 @@ async function runOne({
   const patch = await capturePatch(runDir, changed);
   await writeFile(path.join(patchesDir, `${runName}.patch.txt`), patch, "utf8");
   const hidden = await hiddenEvaluation(runDir, scenarioId, scenario);
-  const semantic = semanticEvaluation(scenarioId, trace.finalAnswer, changed);
+  const semantic = semanticEvaluation(scenarioId, scenario, condition, trace.finalAnswer, changed);
   const evaluationPassed = hidden?.passed ?? semantic?.passed ?? false;
   const routeState = routeAndStateMetrics(
     condition,
@@ -1637,7 +1653,7 @@ async function reanalyzeExisting(outputRoot) {
     const wrongChanges = changed.filter(
       (file) => !allowedChange(file, scenario, old.condition),
     );
-    const semantic = semanticEvaluation(old.scenario, trace.finalAnswer, changed);
+    const semantic = semanticEvaluation(old.scenario, scenario, old.condition, trace.finalAnswer, changed);
     const evaluationPassed =
       old.hiddenEvaluation?.passed ?? semantic?.passed ?? false;
     const routeState = routeAndStateMetrics(
