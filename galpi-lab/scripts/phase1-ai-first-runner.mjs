@@ -362,8 +362,8 @@ console.log("hidden-roster: PASS");
       M2: ["src/student/"],
     },
     allowedPrefixes: {
-      M0: ["src/app/", "src/core/core.ts", "src/index.ts", "src/test/"],
-      M2: ["src/student/", "src/index.ts"],
+      M0: ["src/app/", "src/core/", "src/index.ts", "src/test/"],
+      M2: ["src/student/", "src/shared/", "src/index.ts"],
     },
     hiddenEvaluator: String.raw`
 import assert from "node:assert/strict";
@@ -419,14 +419,18 @@ console.log("hidden-m-sorting: PASS");
       M2: ["src/student/"],
     },
     allowedPrefixes: {
-      M0: ["src/app/", "src/core/core.ts", "src/index.ts", "src/test/"],
-      M2: ["src/student/", "src/index.ts"],
+      M0: ["src/app/", "src/core/", "src/index.ts", "src/test/"],
+      M2: ["src/student/", "src/shared/", "src/index.ts"],
     },
+    // AIDEV-NOTE: blast radius is derived from reference patches, not guessed. An earlier
+    // version listed src/app/manager.ts for M0; it never needs changing (M0 passes the
+    // evaluator editing only core + data), so declaring it penalised M0 for nothing.
     spreadPrefixes: {
-      M0: ["src/core/core.ts", "src/app/data.ts", "src/app/manager.ts"],
+      M0: ["src/core/core.ts", "src/app/data.ts", "src/test/all.test.ts"],
       M2: [
         "src/student/student.types.student.ts",
         "src/student/student.repository.student.ts",
+        "src/student/student.test.crud.ts",
       ],
     },
     hiddenEvaluator: String.raw`
@@ -463,7 +467,7 @@ console.log("hidden-mf1: PASS");
     },
     allowedPrefixes: {
       M0: ["src/app/", "src/core/", "src/index.ts", "src/test/"],
-      M2: ["src/auth/", "src/index.ts"],
+      M2: ["src/auth/", "src/shared/", "src/index.ts"],
     },
     spreadPrefixes: {
       M0: ["src/core/core.ts", "src/app/manager.ts", "src/test/all.test.ts"],
@@ -1097,6 +1101,26 @@ async function hiddenEvaluation(runDir, scenarioId, scenario) {
   };
 }
 
+// AIDEV-NOTE: file COUNTS are not comparable across conditions whose structures differ in
+// granularity — Phase 3.5 M2 holds the same code in 31 files where M0 uses 12, so "read
+// twice as many files" can still mean fewer tokens (it does). Weigh reads by content size
+// instead. Content comes from the fixture commit, so this also works after worktrees are
+// removed; agent-created files simply contribute 0.
+function countReadTokens(commit, files, encoder, gitRoot) {
+  let tokens = 0;
+  for (const file of files) {
+    const shown = spawnSync("git", ["show", `${commit}:${file}`], {
+      cwd: gitRoot,
+      encoding: "utf8",
+      windowsHide: true,
+      maxBuffer: 32 * 1024 * 1024,
+    });
+    if (shown.status !== 0) continue;
+    tokens += encoder.encode(shown.stdout).length;
+  }
+  return tokens;
+}
+
 async function countTokenFiles(runDir, files, encoder) {
   let tokens = 0;
   const details = [];
@@ -1364,6 +1388,14 @@ async function runOne({
     changed,
   );
   const spread = spreadCoverage(scenario, condition, changed);
+  const gitRootForReads = runSync("git", ["rev-parse", "--show-toplevel"]).stdout.trim();
+  const readTokens = countReadTokens(config.commit, trace.readFiles, encoder, gitRootForReads);
+  const unrelatedReadTokens = countReadTokens(
+    config.commit,
+    trace.unrelatedReads,
+    encoder,
+    gitRootForReads,
+  );
   const deadCodeReads = trace.readFiles.filter((file) =>
     file.startsWith("src/legacy/"),
   );
@@ -1379,6 +1411,8 @@ async function runOne({
     conditionLabel: config.label,
     commit: config.commit,
     spreadCoverage: spread,
+    readTokens,
+    unrelatedReadTokens,
     scenario: scenarioId,
     scenarioTitle: scenario.title,
     expectedTask: scenario.expectedTask,
@@ -1495,6 +1529,8 @@ function aggregateResults(results, expectedRuns = results.length, suiteName = DE
       ),
       averageReadFiles: average(rows.map((row) => row.readFiles.length)),
       averageUnrelatedReads: average(rows.map((row) => row.unrelatedReads.length)),
+      averageReadTokens: average(rows.map((row) => row.readTokens)),
+      averageUnrelatedReadTokens: average(rows.map((row) => row.unrelatedReadTokens)),
       averageSpreadCompleteness: average(
         rows
           .filter((row) => row.spreadCoverage)
@@ -1631,6 +1667,8 @@ async function reanalyzeExisting(outputRoot) {
   const previous = JSON.parse(await readFile(resultsPath, "utf8"));
   const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
   const agent = metadata.agent ?? "codex";
+  const encoder = getEncoding("o200k_base");
+  const gitRootForReads = runSync("git", ["rev-parse", "--show-toplevel"]).stdout.trim();
   const revised = [];
 
   for (const old of previous) {
@@ -1672,6 +1710,14 @@ async function reanalyzeExisting(outputRoot) {
       readFiles: trace.readFiles,
       relevantReads: trace.relevantReads,
       unrelatedReads: trace.unrelatedReads,
+      readTokens: countReadTokens(old.commit, trace.readFiles, encoder, gitRootForReads),
+      unrelatedReadTokens: countReadTokens(
+        old.commit,
+        trace.unrelatedReads,
+        encoder,
+        gitRootForReads,
+      ),
+      spreadCoverage: spreadCoverage(scenario, old.condition, changed),
       firstRelevantCommand: trace.firstRelevantCommand,
       wholeRepositorySearch: trace.wholeRepositorySearch,
       routeSelected: routeState.routeSelected,
