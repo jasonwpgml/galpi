@@ -1,5 +1,45 @@
 # Handoff (최신이 맨 위)
 
+## 2026-07-27 claude (11) — Phase 3.5 Stage A 측정 완료
+
+- Done: `p35-stageA-1` 배치 24/24 유효 (초회 20건 usage_limit → `--retry-excluded`로 재실행).
+  Claude 단독, M0 vs M2, 비용 $7.33 (추정 $8과 일치). 보고서
+  `docs/experiments/phase35-structure.md`.
+- 측정값: 총 토큰 -9.9%, 유효 토큰 -13.1%, 비용 -15.4%, 최초 도달 1.92→1.25.
+  정확도는 전 조건 100% 동률.
+  **단, 집계는 session-flow 단독 스윙(-67%)이 끌어올린 값이다.** 시나리오별로 보면
+  탐색 과제만 크게 이기고(-67%), 편집 과제는 작거나(-6~7%) 역전된다(m-sorting +14.7%,
+  M2 열세). "구조 개선은 탐색 비용을 줄이지 편집 비용을 줄이지 않는다"는 해석이 데이터와
+  맞지만 4시나리오·3반복으로는 여기까지가 한계.
+- **판정: Stage B 진행 가치 있음. 단 계측 결함 3건 수정 후.**
+- **Stage A의 더 중요한 산출물은 수치가 아니라 계측 결함 발견이다.** 셋 다 조건 차이가
+  아니라 내가 만든 시나리오 정의의 결함이고, 고치지 않으면 Stage B가 같은 편향을
+  4조건으로 확대 재생산한다:
+  1. `allowedPrefixes` 비대칭 → `wrongChangeRate` 무효. M2가 3배 나빠 보였으나 실체는
+     전화번호 정규화 헬퍼를 `src/shared/shared.service.text.ts`에 넣은 것 — M2 구조에선
+     타당한 배치다. M0는 `src/app/`·`src/core/`를 통째로 허용해뒀고 M2는 `src/student/`만
+     좁게 허용해서, 같은 행동이 M0에서만 통과했다.
+  2. `spreadPrefixes` 과선언 → 완전성 지표 무효. M0가 "빠뜨린" `src/app/manager.ts`는
+     애초에 고칠 필요가 없는 파일이었다 (M0는 3런 모두 core+data만 고치고 평가자 통과).
+     파급 목록은 추측이 아니라 정답 패치에서 역산해야 한다.
+  3. 개수 기반 지표가 파일 세분도에 오염. M2는 파일을 2배 이상 읽지만(7.75→16.58)
+     같은 배치에서 토큰은 더 적다. M0 12파일 vs M2 31파일이라 같은 내용이 잘게 나뉜
+     것뿐이다. 소스 트리가 byte-identical이던 Phase 1엔 없던 문제 — 여기선 구조 변경이
+     실험 목적이라 구조적 편향이다. **토큰만 정직한 척도.**
+  4. (추가) 정확도 천장 — 전 조건·전 시나리오 100%라 이 시나리오 집합으로는 정확도 축에서
+     아무것도 구분 못 한다.
+- Verification ledger:
+  - target: `p35-stageA-1` | check: 24/24 유효, excluded 0 | evidence: aggregate.json validity
+  - target: 러너 phase35 suite | check: 양 suite `--validate-only` 통과, phase1 회귀 없음
+  - **not verified / 무효 처리**: `wrongChangeRate`, `averageSpreadCompleteness`,
+    `fullSpreadRate`, `averageReadFiles`, `averageUnrelatedReads` — 위 결함으로 이번 배치에서
+    사용 불가. 보고서에 명시했다.
+- Next: 계측 결함 4건 수정 → Stage A `--reanalyze` 재집계(재실행 불요, 채점 규칙만 변경)
+  → 그 결과로 Stage B 착수 여부 최종 확인.
+- 부수 관찰: doctor 소견 30건만 고쳐 만든 M2가 Phase 0에서 사람이 손으로 잡은 clean fixture
+  구조와 사실상 일치했다. 휴리스틱이 임의의 제3안을 만들지 않았다는 약한 방증이자, 동시에
+  M2가 이미 사람이 최적화한 구조에 가깝다는 뜻이라 효과 크기는 낙관 쪽으로 치우쳤을 수 있다.
+
 ## 2026-07-27 claude (10) — Phase 6 신설 (사용 기반 자기 개선)
 
 - Human decision: 갈피에 자가학습을 도입하되, 학습 결과를 예외 가능성을 포함한

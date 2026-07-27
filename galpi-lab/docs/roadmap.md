@@ -717,12 +717,26 @@ fixture에서 전/후를 비교해야 한다.
 
 ### 체크리스트
 
-- [ ] `galpi-messy-lab/` fixture 제작: galpi-lab과 동일 기능·동일 테스트를
-  일부러 나쁜 구조로 구현 — 긴 혼합 책임 파일, 모호한 이름(`utils.ts`, `helper.ts`,
-  `manager2.ts` 류), 흩어진 테스트, index 우회 deep import, 숨은 불변식 무표기.
-- [ ] `galpi doctor`(Phase 2)를 messy fixture에 실행해 진단 항목 확정.
-  구조 개선본은 doctor 지적 사항만 고친다 (자의적 개선 금지 — 변환 추적 가능성 확보).
-- [ ] 조건 정의 (2×2):
+> **Stage A 완료 (2026-07-27)** — `docs/experiments/phase35-structure.md`.
+> M0 vs M2, Claude 단독 24/24, $7.33. 총 토큰 -9.9%·유효 -13.1%·비용 -15.4%, 정확도 100% 동률.
+> 다만 집계는 session-flow 단독 스윙(-67%)이 끌어올린 값이고 m-sorting은 M2가 +14.7% 열세다.
+> **자금 게이트 판정: Stage B 진행 가치 있음. 단 계측 결함 3건 수정 후.**
+> (`allowedPrefixes` 비대칭 → 오수정률 무효 / `spreadPrefixes` 과선언 → 완전성 무효 /
+> 개수 기반 지표가 파일 세분도에 오염 — 토큰만 정직한 척도)
+
+- [x] `galpi-messy-lab/` fixture 제작 (→ `phase35/fixture-m0` `4d468a5`, 12파일 1251줄)
+- [x] `galpi doctor`를 messy fixture에 실행해 진단 항목 확정 (30건, `phase35-m0-doctor.md`)
+- [x] 구조 개선본 도출 (→ `phase35/fixture-m2` `18dc66f`, doctor 0건)
+- [x] **Stage A 측정** — M0 vs M2, Claude 단독 24/24. 결과·판정은 위 메모 참조.
+- [ ] **Stage B 진입 전 계측 결함 수정** (Stage A의 주 산출물):
+  - [ ] 조건별 `allowedPrefixes`를 대칭으로 재선언 — 현재 M0는 잡동사니 디렉토리를 통째로,
+    M2는 도메인 하나만 허용해 같은 행동이 M0에서만 통과한다.
+  - [ ] `spreadPrefixes`를 정답 패치에서 역산 — 추측으로 선언한 불필요 파일이 M0를 부당 감점.
+  - [ ] 개수 기반 지표(`readFiles`, `unrelatedReads`)를 판정 축에서 제외하거나 세분도 정규화.
+    소스 트리가 byte-identical이던 Phase 1과 달리 여기서는 구조 변경이 목적이라 구조적 편향.
+  - [ ] 정확도 천장(전 조건 100%) 대응 — 시나리오 보강 여부 결정.
+  - [ ] 수정 후 Stage A `--reanalyze` 재집계 (채점 규칙만 바뀌므로 재실행 불요).
+- [ ] Stage B — 조건 정의 (2×2):
   - **M0** — 지저분한 원본, Galpi 없음 (베이스라인)
   - **M1** — 지저분한 원본 + compact Galpi (`갈피로 나쁜 구조를 얼마나 구제하는가`)
   - **M2** — 구조 개선 원본, Galpi 없음 (`구조만으로 얼마나 가는가`)
