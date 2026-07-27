@@ -94,12 +94,26 @@ const CONDITIONS = {
     bootstrapFiles: [],
     hasProtocol: false,
   },
+  M1: {
+    label: "messy structure + compact Galpi",
+    branch: "phase35/fixture-m1",
+    commit: "45485b8f1bcb73835cebec6eb4cd5efb6480c75f",
+    bootstrapFiles: ["AGENTS.md", ".galpi/BOOT.gp", ".galpi/MAP.gp"],
+    hasProtocol: true,
+  },
   M2: {
     label: "improved structure, no Galpi",
     branch: "phase35/fixture-m2",
     commit: "18dc66fbaee64ec38a971e6c7396eee153c58a79",
     bootstrapFiles: [],
     hasProtocol: false,
+  },
+  M3: {
+    label: "improved structure + compact Galpi",
+    branch: "phase35/fixture-m3",
+    commit: "4a5fb9fe2110968665684c936513b9a365de7191",
+    bootstrapFiles: ["AGENTS.md", ".galpi/BOOT.gp", ".galpi/MAP.gp"],
+    hasProtocol: true,
   },
 };
 
@@ -115,7 +129,17 @@ const SUITES = {
     baseline: "B",
     treatment: "C",
   },
+  // Stage A ran M0 vs M2 only; Stage B adds the two Galpi-carrying conditions. Source
+  // trees pair up (M0=M1, M2=M3), so parity is asserted within pairs, not across all four.
   phase35: {
+    conditions: ["M0", "M1", "M2", "M3"],
+    scenarios: ["m-sorting", "m-session-flow", "mf1", "mf3"],
+    parityGroup: null,
+    parityPairs: [["M0", "M1"], ["M2", "M3"]],
+    baseline: "M0",
+    treatment: "M3",
+  },
+  "phase35-stage-a": {
     conditions: ["M0", "M2"],
     scenarios: ["m-sorting", "m-session-flow", "mf1", "mf3"],
     parityGroup: null,
@@ -365,6 +389,14 @@ console.log("hidden-roster: PASS");
       M0: ["src/app/", "src/core/", "src/index.ts", "src/test/"],
       M2: ["src/student/", "src/shared/", "src/index.ts"],
     },
+    queryFiles: {
+      M1: [".galpi/v/t/ap.student_list.gp"],
+      M3: [".galpi/v/t/st.list.gp"],
+    },
+    routeViews: {
+      M1: [".galpi/v/t/ap.student_list.gp"],
+      M3: [".galpi/v/t/st.list.gp"],
+    },
     hiddenEvaluator: String.raw`
 import assert from "node:assert/strict";
 import { createStudentModule, MemoryDatabase } from "./src/index.ts";
@@ -401,6 +433,14 @@ console.log("hidden-m-sorting: PASS");
       M2: ["src/auth/"],
     },
     allowedPrefixes: [],
+    queryFiles: {
+      M1: [".galpi/v/t/ap.login.gp"],
+      M3: [".galpi/v/t/a.login.gp"],
+    },
+    routeViews: {
+      M1: [".galpi/v/t/ap.login.gp"],
+      M3: [".galpi/v/t/a.login.gp"],
+    },
     answerPaths: {
       M0: ["src/app/manager.ts", "src/test/all.test.ts"],
       M2: ["src/auth/auth.command.login.ts", "src/auth/auth.test.login.ts"],
@@ -421,6 +461,14 @@ console.log("hidden-m-sorting: PASS");
     allowedPrefixes: {
       M0: ["src/app/", "src/core/", "src/index.ts", "src/test/"],
       M2: ["src/student/", "src/shared/", "src/index.ts"],
+    },
+    queryFiles: {
+      M1: [".galpi/v/t/ap.student_create.gp"],
+      M3: [".galpi/v/t/st.create.gp"],
+    },
+    routeViews: {
+      M1: [".galpi/v/t/ap.student_create.gp"],
+      M3: [".galpi/v/t/st.create.gp"],
     },
     // AIDEV-NOTE: blast radius is derived from reference patches, not guessed. An earlier
     // version listed src/app/manager.ts for M0; it never needs changing (M0 passes the
@@ -469,6 +517,14 @@ console.log("hidden-mf1: PASS");
       M0: ["src/app/", "src/core/", "src/index.ts", "src/test/"],
       M2: ["src/auth/", "src/shared/", "src/index.ts"],
     },
+    queryFiles: {
+      M1: [".galpi/v/t/ap.login.gp"],
+      M3: [".galpi/v/t/a.login.gp"],
+    },
+    routeViews: {
+      M1: [".galpi/v/t/ap.login.gp"],
+      M3: [".galpi/v/t/a.login.gp"],
+    },
     spreadPrefixes: {
       M0: ["src/core/core.ts", "src/app/manager.ts", "src/test/all.test.ts"],
       M2: [
@@ -507,6 +563,17 @@ console.log("hidden-mf3: PASS");
 `,
   },
 };
+
+// AIDEV-NOTE: M1 shares M0's source tree and M3 shares M2's, so every per-condition prefix
+// list mirrors its twin. Declaring them twice would let the two drift apart silently.
+for (const scenario of Object.values(SCENARIOS)) {
+  for (const key of ["relevantPrefixes", "allowedPrefixes", "spreadPrefixes", "answerPaths"]) {
+    const value = scenario[key];
+    if (!value || Array.isArray(value)) continue;
+    if (value.M0 && !value.M1) value.M1 = value.M0;
+    if (value.M2 && !value.M3) value.M3 = value.M2;
+  }
+}
 
 function parseArguments(argv) {
   const suiteArg = argv.find((a) => a.startsWith("--suite="));
@@ -628,12 +695,21 @@ async function validateFixture(agent, suiteName = DEFAULT_SUITE) {
   if (suiteName !== "phase1") {
     for (const condition of suite.conditions) {
       const files = runSync("git", ["ls-tree", "-r", "--name-only", CONDITIONS[condition].commit], { cwd: gitRoot }).stdout;
-      if (CONDITIONS[condition].hasProtocol) continue;
-      if (/(^|\n)(AGENTS\.md|\.galpi\/)/.test(files)) {
-        throw new Error(`Condition ${condition} unexpectedly contains Galpi instructions`);
-      }
       if (!files.includes("src/index.ts")) {
         throw new Error(`Condition ${condition} lacks the fixed public entry src/index.ts`);
+      }
+      const carries = /(^|\n)(AGENTS\.md|\.galpi\/)/.test(files);
+      if (CONDITIONS[condition].hasProtocol !== carries) {
+        throw new Error(
+          `Condition ${condition} hasProtocol=${CONDITIONS[condition].hasProtocol} but Galpi files ${carries ? "present" : "absent"}`,
+        );
+      }
+    }
+    // AIDEV-NOTE: within a pair the only difference must be the index. If a source file
+    // drifted between M0 and M1 the comparison would silently measure two variables.
+    for (const [left, right] of suite.parityPairs ?? []) {
+      if (sourceHashes.get(left) !== sourceHashes.get(right)) {
+        throw new Error(`${left}/${right} application trees differ`);
       }
     }
     return;
