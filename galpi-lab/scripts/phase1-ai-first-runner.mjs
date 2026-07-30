@@ -453,7 +453,12 @@ console.log("hidden-m-sorting: PASS");
     expectedTask: "st.create",
     prompt:
       COMMON_PREFIX +
-      "Add an optional phone field to the student record. It must be accepted when creating a student, accepted when updating one, returned on the stored record, and normalised by stripping every character that is not a digit or a leading plus. Creating a student without a phone leaves the field absent. Export the updated types from src/index.ts, add regression tests, and run the relevant tests.",
+      // AIDEV-NOTE: the normalisation rule is spelled out with worked examples because an
+      // earlier wording ("strip every character that is not a digit or a leading plus")
+      // was read two ways: Codex dropped the leading + and failed all four conditions,
+      // Claude kept it and passed all four. That is a difference in reading instructions,
+      // not in navigating code, so it was noise on the axis this suite measures.
+      "Add an optional phone field to the student record. It must be accepted when creating a student, accepted when updating one, and returned on the stored record. Normalise it by trimming surrounding whitespace, keeping a leading '+' if one is present, and removing every remaining character that is not a digit. Examples: ' +82 (10) 1234-5678 ' is stored as '+821012345678'; '010-999-0000' is stored as '0109990000'. Creating a student without a phone leaves the field absent. Export the updated types from src/index.ts, add regression tests, and run the relevant tests.",
     relevantPrefixes: {
       M0: ["src/app/manager.ts", "src/app/data.ts", "src/core/core.ts", "src/test/"],
       M2: ["src/student/"],
