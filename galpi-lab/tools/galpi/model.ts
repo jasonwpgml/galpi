@@ -30,6 +30,7 @@ export interface Runtime {
   boot: GpFile;
   source: GpFile;
   map: GpFile | null;
+  manifest: GpFile | null;
   views: GpFile[];
   statusFiles: GpFile[];
   stateCodes: Set<string>;
@@ -61,6 +62,8 @@ export function loadRuntime(root: string): Runtime {
   const source = loadGpFile(path.join(galpiDir, "source.gp"));
   const mapPath = path.join(galpiDir, "MAP.gp");
   const map = existsSync(mapPath) ? loadGpFile(mapPath) : null;
+  const manifestPath = path.join(galpiDir, "manifest.gp");
+  const manifest = existsSync(manifestPath) ? loadGpFile(manifestPath) : null;
   const views = collectGpFiles(path.join(galpiDir, "v")).map(loadGpFile);
   const statusFiles = collectGpFiles(path.join(galpiDir, "status")).map(loadGpFile);
 
@@ -96,6 +99,7 @@ export function loadRuntime(root: string): Runtime {
     boot,
     source,
     map,
+    manifest,
     views,
     statusFiles,
     stateCodes,

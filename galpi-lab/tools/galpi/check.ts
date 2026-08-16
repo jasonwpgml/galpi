@@ -37,6 +37,7 @@ function checkParseIssues(runtime: Runtime, errors: CheckError[]): void {
     runtime.boot,
     runtime.source,
     ...(runtime.map ? [runtime.map] : []),
+    ...(runtime.manifest ? [runtime.manifest] : []),
     ...runtime.views,
     ...runtime.statusFiles,
   ];

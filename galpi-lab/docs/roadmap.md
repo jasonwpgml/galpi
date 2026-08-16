@@ -676,13 +676,17 @@ ERR|missing_ref|t=a.login|f=f9
 
 **목적**: 코드 구조를 자동 추출해 compact MAP, manifest, View를 동시에 만든다.
 
+> **MVP 구현됨**: TypeScript AST 기반 `manifest.gp` 생성, 최신성 검사, route/task 의도와
+> 실제 import·test 그래프를 결합한 `galpi query`까지 완료. View 전면 자동 생성과 다언어
+> 파서는 아직 남아 있으므로 Phase 3 전체 완료로 판정하지 않는다.
+
 ### 원칙
 
 1. 상태와 의도는 `source.gp`에서만 읽는다.
 2. 구조는 실제 코드에서 추출한다.
 3. 모든 AI 런타임 산출물은 `.gp`로 생성한다.
 4. 사람용 YAML/Markdown은 debug 옵션일 뿐이다.
-5. 직접 AST를 만들지 않고 `ts-morph`, 필요 시 `tree-sitter`를 사용한다.
+5. TypeScript는 설치된 compiler API를 사용하고, 다언어 확장 시 `tree-sitter`를 사용한다.
 
 ### 체크리스트
 
@@ -693,11 +697,11 @@ ERR|missing_ref|t=a.login|f=f9
   중복·충돌, 과도한 밀도, 잠재적 비밀값을 `WARN`/`ERR`로 보고하고 자동 수정하지 않는다.
 - [ ] **AIDEV 수명주기 검증**: 해소된 `TODO`, 오래 방치된 `QUESTION`, 테스트와 충돌하는
   `NOTE`를 검출하되, 날짜·작업자를 주석 본문에 복제하지 않고 git 이력을 근거로 사용한다.
-- [ ] export symbol → `Y` 레코드 생성.
-- [ ] 파일 → `F` 레코드 생성.
-- [ ] import → `X` 관계 생성.
-- [ ] test → `P` 관계 생성.
-- [ ] source의 상태·route와 코드 구조 병합.
+- [x] export symbol → `Y` 레코드 생성 (symbol line span 포함).
+- [x] 파일 → `F` 레코드 생성.
+- [x] import → `X` 관계 생성.
+- [x] test → `P` 관계 생성.
+- [x] source의 상태·route와 코드 구조 병합 (`galpi query` packet).
 - [ ] 충돌 시 추측하지 않고 `ERR` 또는 상태 `5` 출력.
 - [ ] 한 번의 build에서 생성:
 
@@ -712,14 +716,16 @@ ERR|missing_ref|t=a.login|f=f9
   ```
 
 - [ ] `MAP.gp`에는 route와 상위 상태만 저장.
-- [ ] `manifest.gp`는 전체 레코드를 저장하되 기본 컨텍스트에서 읽지 않음.
+- [x] `manifest.gp`는 전체 레코드를 저장하되 기본 컨텍스트에서 읽지 않음.
 - [ ] 개별 View에는 해당 task 수행에 필요한 최소 레코드만 저장.
-- [ ] ID dictionary를 사용해 긴 경로 반복을 줄임.
+- [x] ID dictionary를 사용해 긴 경로 반복을 줄임.
+- [x] `galpi query <text>`가 의미 점수로 seed를 고른 뒤 실제 import·test 폐쇄로
+      최소 파일·심볼 서브그래프를 반환. 임베딩은 구조 결정권을 갖지 않음.
 - [ ] **축약 경로 실측** (헌법 9조): `v/t/` vs `v/task/` 형태로 동일 시나리오를 양 에이전트에서
       실행해 토큰 차이와 오해·parse 오류율 비교. 차이가 미미하면 가독형(`v/task/`) 채택.
-- [ ] 생성물에 장문 헤더를 넣지 않고 한 줄 버전 표시만 사용: `G|1|gen`.
+- [x] 생성물에 장문 헤더를 넣지 않고 한 줄 버전 표시만 사용: `G|1|gen`.
 - [ ] 순환 의존, 고립 task, 없는 entrypoint, 테스트 없는 HOT/WIP를 경고.
-- [ ] `galpi build --check`로 생성물 최신 상태 검증.
+- [x] `galpi build --check`로 `manifest.gp` 최신 상태 검증.
 - [ ] `galpi build --debug`에서만 YAML/Markdown 설명 생성.
 - [ ] Phase 1의 A/B/C 실험 재실행 — **Claude Code와 Codex 양쪽에서**.
 - [ ] View 크기, 생성 시간, query packet 토큰 수까지 기록.

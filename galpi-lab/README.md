@@ -22,6 +22,10 @@ npm run demo
 ```bash
 npm run galpi -- check     # 런타임 계약 검증 (pre-commit·CI와 동일 게이트)
 npm run galpi -- doctor    # 구조 진단 (읽기 전용, --root <path>로 외부 트리도 가능)
+npm run galpi -- build     # 실제 코드의 file/symbol/import/test 그래프 생성
+npm run galpi -- build --check
+npm run galpi -- query 수강신청         # 최소 GP query packet
+npm run galpi -- query 수강신청 --human # 경로와 symbol line span
 ```
 
 ## 문서

@@ -8,6 +8,7 @@ import { spawnSync } from "node:child_process";
 import { parseGp } from "./gp.ts";
 import { runCheck } from "./check.ts";
 import { runDoctor } from "./doctor.ts";
+import { buildCodeGraph, buildManifest, queryGraph } from "./graph.ts";
 import { addRoute, rmRoute, setState } from "./mutate.ts";
 
 const BOOT = `G|1|boot
@@ -33,10 +34,12 @@ D|a|0|src/auth|a=0
 D|lg|4|src/legacy|a=4
 D|b|2|-|a=2
 T|a.login|0|q=login|a=0
+T|a.session|0|q=token_to_current_user|a=0
 R|login|a.login
+R|currentuser|a.session
 `,
   );
-  write(root, ".galpi/MAP.gp", "G|1|gen\nR|login|a.login\n");
+  write(root, ".galpi/MAP.gp", "G|1|gen\nR|login|a.login\nR|currentuser|a.session\n");
   write(
     root,
     ".galpi/v/t/a.login.gp",
@@ -47,7 +50,18 @@ Y|y1|login|f1
 `,
   );
   write(root, "src/auth/auth.command.login.ts", "export function login() {}\n");
-  write(root, "src/auth/index.ts", "export { login } from './auth.command.login.ts';\n");
+  write(
+    root,
+    "src/auth/auth.query.current-user.ts",
+    "import type { AuthSession } from './auth.types.auth.ts';\nexport function currentUser(): AuthSession | undefined { return undefined; }\n",
+  );
+  write(root, "src/auth/auth.types.auth.ts", "export interface AuthSession { token: string }\n");
+  write(
+    root,
+    "src/auth/index.ts",
+    "export { login } from './auth.command.login.ts';\nexport { currentUser } from './auth.query.current-user.ts';\n",
+  );
+  write(root, "src/auth/auth.test.login.ts", "import { login } from './index.ts';\nvoid login;\n");
   write(root, "src/legacy/legacy.service.csv-import.ts", "export function parseLegacyRoster() {}\n");
   write(root, "src/legacy/index.ts", "export {};\n");
   return root;
@@ -106,7 +120,7 @@ F|f1|src/auth/auth.command.login.ts
     );
     const kinds = runCheck(root, { git: false }).map((error) => error.kind);
     assert.ok(kinds.includes("view_state_desync"));
-    assert.ok(kinds.filter((kind) => kind === "map_desync").length === 2); // missing + extra
+    assert.ok(kinds.filter((kind) => kind === "map_desync").length === 3); // two missing + extra
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -201,6 +215,61 @@ test("doctor flags ambiguous names, deep imports, and far tests", () => {
   }
 });
 
+test("build derives a deterministic file, symbol, and import graph", () => {
+  const root = makeFixture();
+  try {
+    const graph = buildCodeGraph(root);
+    assert.ok(graph.files.some((file) => file.path === "src/auth/auth.command.login.ts"));
+    assert.ok(
+      graph.symbols.some(
+        (symbol) => symbol.name === "login" && symbol.startLine === 1 && symbol.endLine === 1,
+      ),
+    );
+    assert.ok(graph.edges.length > 0);
+
+    const first = buildManifest(root);
+    assert.equal(first.changed, true);
+    assert.match(first.manifest, /V\|code_graph\|f=7\|y=/);
+    assert.match(first.manifest, /P\|[^|]+\|to=f/);
+    assert.equal(buildManifest(root, { check: true }).changed, false);
+
+    write(root, "src/auth/auth.command.login.ts", "export function login() {}\nexport const logout = 1;\n");
+    assert.equal(buildManifest(root, { check: true }).changed, true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("query resolves task intent to a minimal live-code subgraph", () => {
+  const root = makeFixture();
+  try {
+    const login = queryGraph(root, "please fix login");
+    assert.equal(login.task, "a.login");
+    assert.deepEqual(
+      login.files.map((file) => file.path),
+      ["src/auth/auth.command.login.ts", "src/auth/auth.test.login.ts", "src/auth/index.ts"],
+    );
+    assert.match(login.packet, /Y\|[^|]+\|login\|[^|]+\|line=1-1/);
+    assert.doesNotMatch(login.packet, /src\/legacy/);
+    assert.doesNotMatch(login.packet, /auth\.query\.current-user/);
+
+    const session = queryGraph(root, "currentuser");
+    assert.equal(session.task, "a.session");
+    assert.match(session.packet, /auth\.query\.current-user/);
+    assert.match(session.packet, /auth\.types\.auth/);
+    assert.doesNotMatch(session.packet, /auth\.command\.login/);
+
+    const unregistered = queryGraph(root, "invoice");
+    assert.equal(unregistered.task, null);
+
+    const missing = queryGraph(root, "completely unknown work");
+    assert.equal(missing.task, null);
+    assert.match(missing.packet, /reason=route_miss/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("plan_has_code detects code nested below a PLAN domain", () => {
   const root = makeFixture();
   try {
@@ -242,6 +311,29 @@ test("cli --root inspects a tree other than its own checkout", () => {
     assert.equal(result.status, 0);
     assert.match(result.stdout, /ambiguous_name/);
     assert.match(result.stdout, /src\/auth\/utils\.ts/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("cli build and query operate on an external root", () => {
+  const root = makeFixture();
+  try {
+    const cli = path.resolve("tools/galpi/cli.ts");
+    const tsx = path.resolve("node_modules/tsx/dist/cli.mjs");
+    const build = spawnSync(process.execPath, [tsx, cli, "build", "--root", root], {
+      encoding: "utf8",
+    });
+    assert.equal(build.status, 0, build.stderr);
+    assert.match(build.stdout, /OK\|build\|files=7/);
+    assert.match(readFileSync(path.join(root, ".galpi/manifest.gp"), "utf8"), /Y\|[^|]+\|login\|/);
+
+    const query = spawnSync(process.execPath, [tsx, cli, "query", "login", "--root", root], {
+      encoding: "utf8",
+    });
+    assert.equal(query.status, 0, query.stderr);
+    assert.match(query.stdout, /Q\|a\.login\|0/);
+    assert.match(query.stdout, /src\/auth\/auth\.command\.login\.ts/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

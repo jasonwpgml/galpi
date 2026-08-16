@@ -1,7 +1,8 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { CheckError, runCheck } from "./check.ts";
+import { buildManifest } from "./graph.ts";
 import { loadRuntime, parseState } from "./model.ts";
 
 export interface MutationResult {
@@ -14,7 +15,7 @@ export interface MutationResult {
 // is applied in memory, re-validated via runCheck against the real tree only
 // after writing, and rolled back byte-for-byte when new errors appear.
 // AIDEV-NOTE: rollback must cover every derived file, not just source.gp -- syncMap,
-// syncViewStates and runCheck all write or parse after the source write, so a throw
+// syncViewStates, buildManifest and runCheck all write or parse after the source write, so a throw
 // there would otherwise strand a mutated source with unsynced MAP/views. The snapshot
 // is taken before the first write and restored on both validation failure and throw.
 function applySourceEdit(
@@ -37,6 +38,7 @@ function applySourceEdit(
     writeFileSync(sourcePath, edited.join(newline), "utf8");
     syncMap(root);
     syncViewStates(root);
+    buildManifest(root);
     const after = runCheck(root, { git: false }).filter(
       (error) => !baselineKeys.has(errorKey(error)),
     );
@@ -51,14 +53,17 @@ function applySourceEdit(
   }
 }
 
-/** Byte snapshot of every file a mutation can write: source, MAP, views, status files. */
-function snapshotRuntimeFiles(root: string): Map<string, string> {
-  const snapshot = new Map<string, string>();
+/** Byte snapshot of every file a mutation can write: source, MAP, manifest, views, status. */
+function snapshotRuntimeFiles(root: string): Map<string, string | null> {
+  const snapshot = new Map<string, string | null>();
   const add = (file: string): void => {
-    if (!snapshot.has(file) && existsSync(file)) snapshot.set(file, readFileSync(file, "utf8"));
+    if (!snapshot.has(file)) {
+      snapshot.set(file, existsSync(file) ? readFileSync(file, "utf8") : null);
+    }
   };
   add(path.join(root, ".galpi", "source.gp"));
   add(path.join(root, ".galpi", "MAP.gp"));
+  add(path.join(root, ".galpi", "manifest.gp"));
   try {
     const runtime = loadRuntime(root);
     for (const view of [...runtime.views, ...runtime.statusFiles]) add(view.path);
@@ -68,8 +73,14 @@ function snapshotRuntimeFiles(root: string): Map<string, string> {
   return snapshot;
 }
 
-function restoreSnapshot(snapshot: Map<string, string>): void {
-  for (const [file, content] of snapshot) writeFileSync(file, content, "utf8");
+function restoreSnapshot(snapshot: Map<string, string | null>): void {
+  for (const [file, content] of snapshot) {
+    if (content === null) {
+      if (existsSync(file)) unlinkSync(file);
+    } else {
+      writeFileSync(file, content, "utf8");
+    }
+  }
 }
 
 function errorKey(error: CheckError): string {

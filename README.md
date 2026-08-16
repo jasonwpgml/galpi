@@ -99,13 +99,17 @@ npm install
 npm run galpi -- check      # 런타임 계약 검증 (exit 1 = 위반). pre-commit·CI와 동일 게이트
 npm run galpi -- doctor     # 구조 진단 (항상 exit 0, 소견만)
 npm run galpi -- doctor --root <path>   # 외부 저장소 진단
+npm run galpi -- build      # 실제 코드에서 manifest.gp 구조 그래프 생성
+npm run galpi -- build --check          # manifest 최신성 검사 (쓰기 없음)
+npm run galpi -- query 수강신청         # task + 최소 파일·심볼·의존 관계 반환
+npm run galpi -- query 수강신청 --human # 사람이 읽기 쉬운 출력
 npm run galpi -- set-state <id> <code>  # 상태 변경
 npm run galpi -- add-route <alias> <task-id>
 npm run galpi -- rm-route <alias>
 npm run galpi -- add-task <id> <state> [k=v...]
 npm run galpi -- add-domain <id> <state> <path> [k=v...]
 
-npm run check               # typecheck + 16 tests + galpi check + build
+npm run check               # typecheck + 19 tests + galpi/check/build freshness + app build
 ```
 
 `.galpi/`를 손으로 편집하지 않는다. 모든 변형은 CLI를 거치며, CLI는 쓰기 전 스키마 검증과
@@ -174,7 +178,7 @@ npm run check               # typecheck + 16 tests + galpi check + build
 | 1 / 1.5 | 효과 측정 + Codex 교차 검증 게이트 | 완료 |
 | 2 | `galpi check`/`doctor`, 변형 커맨드, 훅, pre-commit, CI | 완료 |
 | **3.5** | 구조 개선 효과 측정 (M0~M3, 96런) | **완료** |
-| 3 | `galpi build` — AI View 자동 생성 | 미착수 |
+| 3 | `galpi build/query` — 코드 그래프와 최소 질의 | MVP 구현, View 자동 생성 미완 |
 | 4 | 에이전트 통합 (스킬·훅 / AGENTS.md) | 미착수 |
 | 4.5 | 지시문 계층 토큰 최적화 (규칙 블록화) | 설계만 |
 | 5 | 고도화 (`galpi optimize` 등) | 설계만 |

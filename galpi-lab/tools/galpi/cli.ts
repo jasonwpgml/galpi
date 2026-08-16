@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 
 import { formatAi, formatHuman, runCheck } from "./check.ts";
 import { formatDoctorAi, formatDoctorHuman, runDoctor } from "./doctor.ts";
+import { buildManifest, formatQueryHuman, queryGraph } from "./graph.ts";
 import { addDomain, addRoute, addTask, rmRoute, setState } from "./mutate.ts";
 
 const SELF_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -36,6 +37,28 @@ function main(argv: string[]): number {
       console.log(human ? formatDoctorHuman(findings) : formatDoctorAi(findings));
       return 0; // diagnosis is advisory, never a gate
     }
+    case "build": {
+      const result = buildManifest(ROOT, { check: flags.has("--check") });
+      const stats = result.graph;
+      if (flags.has("--check") && result.changed) {
+        console.error("ERR|build|stale=1|at=.galpi/manifest.gp");
+        return 1;
+      }
+      console.log(
+        `OK|build|files=${stats.files.length}|symbols=${stats.symbols.length}|edges=${stats.edges.length}|changed=${result.changed ? "1" : "0"}`,
+      );
+      return 0;
+    }
+    case "query": {
+      const query = args.join(" ").trim();
+      if (!query) {
+        console.error("ERR|query|msg=missing_query");
+        return 2;
+      }
+      const result = queryGraph(ROOT, query);
+      console.log(human ? formatQueryHuman(result) : result.packet.trimEnd());
+      return result.task ? 0 : 1;
+    }
     case "set-state":
     case "add-route":
     case "rm-route":
@@ -55,6 +78,8 @@ function main(argv: string[]): number {
           "usage: galpi <command> [args] [--root <path>] [--ai|--human] [--no-git]",
           "  check                              validate runtime vs code",
           "  doctor                             read-only structure diagnosis",
+          "  build [--check]                    derive code graph manifest",
+          "  query <text>                       route to a minimal code subgraph",
           "  set-state <id> <state>             change a D/T state in source.gp",
           "  add-route <alias> <task-id>        add a route",
           "  rm-route <alias>                   remove a route",
