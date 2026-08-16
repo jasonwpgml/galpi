@@ -37,8 +37,11 @@
 
 - 검증 원장:
   - target: `/GALPI_SPEC_v0.2_draft.md` rev 2 + 본 규약 | check: 문서 변경만 — 런타임
-    `.gp` 문법·CLI·훅 미변경 (스펙 §0이 명시적으로 보장). pre-commit `galpi check`는
-    handoff.md 스테이징으로 구동됨
+    `.gp` 문법·CLI·훅 미변경 (스펙 §0이 명시적으로 보장). `galpi check` 수동 실행
+    OK|errors=0 | evidence: 실행 출력
+  - **발견**: 이 클론에 `core.hooksPath`가 설정되어 있지 않아 pre-commit `galpi check`가
+    커밋 `d08bfe9`에서 돌지 않았다 (handoff (4)의 "set locally"는 이 클론에 남아있지
+    않았음). `git config core.hooksPath .githooks`로 복구했다 — 이후 커밋부터 재작동.
   - not verified: 패킷 스키마 자체 — 실전 인계 0회. 검증 조건: 실전 사이클 3~5회 +
     `galpi check`에 패킷 검증(hash 불일치·기록 누락) 편입 (스펙 §8 연기 항목).
 - Next:
