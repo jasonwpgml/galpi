@@ -1,0 +1,39 @@
+cff-version: 1.2.0
+message: "If you use Galpi, its experiment data or its specification, please cite it as below and link to the repository."
+title: "Galpi: AI-native codebase navigation for coding agents"
+type: software
+authors:
+  - given-names: Jason
+    alias: jasonwpgml
+repository-code: "https://github.com/jasonwpgml/galpi"
+url: "https://github.com/jasonwpgml/galpi"
+license: Apache-2.0
+version: 0.1.0
+date-released: 2026-10-21
+abstract: >-
+  Galpi is an experimental navigation layer that keeps coding agents such as
+  Claude Code and OpenAI Codex from getting lost in a codebase. It improves
+  code structure upstream and adds a compact machine-readable index (.gp files)
+  only for what code cannot express: task state (done, work in progress, plan,
+  dead, locked), intent and routing from task aliases to the minimal set of
+  files. Rules for dead and locked code are enforced by a PreToolUse hook,
+  pre-commit and CI rather than by prompt compliance. The repository includes a
+  TypeScript CLI (galpi check, doctor, build, query), an A/B experiment harness
+  and measured results from more than 350 isolated agent runs: a compact index
+  cut total tokens by 16.6 to 20.3 percent against verbose docs on Codex, hook
+  gating shrank Claude Code's token overhead from 12.1 to 1.9 percent, and on a
+  1,300-line fixture improved structure alone was cheaper than any index on
+  both agents. Experiment write-ups and the spec draft are CC BY 4.0.
+keywords:
+  - coding agents
+  - ai agents
+  - claude code
+  - codex
+  - codebase navigation
+  - ai-native development
+  - agents.md
+  - code index
+  - context engineering
+  - token efficiency
+  - llm benchmark
+  - pretooluse hook
