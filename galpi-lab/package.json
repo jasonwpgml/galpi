@@ -3,7 +3,32 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Learning-management sample app for validating the Galpi Protocol",
+  "description": "Sample app, galpi CLI and experiment harness for the Galpi Protocol: AI-native codebase navigation for coding agents (Claude Code, Codex)",
+  "keywords": [
+    "galpi",
+    "coding-agents",
+    "ai-agents",
+    "claude-code",
+    "codex",
+    "codebase-navigation",
+    "ai-native",
+    "agents-md",
+    "code-index",
+    "token-efficiency",
+    "llm-benchmark",
+    "pretooluse-hook"
+  ],
+  "license": "Apache-2.0",
+  "author": "Jason (https://github.com/jasonwpgml)",
+  "homepage": "https://github.com/jasonwpgml/galpi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jasonwpgml/galpi.git",
+    "directory": "galpi-lab"
+  },
+  "bugs": {
+    "url": "https://github.com/jasonwpgml/galpi/issues"
+  },
   "scripts": {
     "build": "tsup src/main.ts --format esm --sourcemap --clean",
     "demo": "tsx src/main.ts",

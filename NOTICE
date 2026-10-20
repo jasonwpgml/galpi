@@ -1,0 +1,21 @@
+Galpi
+Copyright 2026 Jason (https://github.com/jasonwpgml)
+
+This product includes software developed by Jason as part of the Galpi
+project: https://github.com/jasonwpgml/galpi
+
+Under the Apache License 2.0, section 4(d), any redistribution or derivative
+work must keep this NOTICE file (or its attribution text) in a readable place,
+such as the NOTICE file, the documentation, or the README.
+
+The following paths are licensed separately under Creative Commons
+Attribution 4.0 International (CC BY 4.0), not Apache-2.0:
+
+  - experiments/                  (experiment index and data notes)
+  - galpi-lab/docs/experiments/   (experiment protocols and result write-ups)
+  - GALPI_SPEC_v0.2_draft.md      (Galpi Protocol specification, draft)
+
+Any use of that material, including in papers, blog posts, benchmarks,
+derived specifications or model training, must credit
+"Galpi by Jason (@jasonwpgml)" and link to https://github.com/jasonwpgml/galpi.
+See experiments/LICENSE.
