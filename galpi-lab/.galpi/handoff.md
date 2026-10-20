@@ -5,6 +5,21 @@
 > 패킷은 서술을 대체하지 않고 정형 필드를 보강한다 (스펙 §6). 단독 작업(L0~L2)에는
 > 패킷을 만들지 않는다 (스펙 §0).
 
+## 2026-10-21 claude (16) — 오픈소스 공개 준비: (15)의 "사양 선공개 안 함" 결정 변경
+
+- Human decision recorded: 소유자 요청으로 저장소 전체를 오픈소스로 공개한다. (15)의
+  "내부 실측 → 코어/프로필 분리 → 공개" 순서 중 공개를 앞당기는 결정이며, (15)의 나머지
+  판단(L3 재선언, 패킷 draft 유지)은 그대로다.
+- 스펙은 계속 **Draft**로 표기한다(`GALPI_SPEC_v0.2_draft.md`, v0.x breaking change 가능).
+  공개가 안정 사양 선언을 뜻하지 않는다.
+- Done (브랜치 `oss-release`, push 안 함): 코드 Apache-2.0 + `NOTICE`(출처 표기 의무),
+  실험 보고서·`experiments/`·스펙은 CC BY 4.0, `CITATION.cff`, `llms.txt`,
+  `CONTRIBUTING.md`, `experiments/README.md`(실험 색인), 영문 `README.md` + `README.ko.md`,
+  문서·러너 주석의 개인 경로를 placeholder로 교체.
+- 주의: 원시 실험 출력(`galpi-lab/.experiments/`)은 이 클론에 없어 공개 대상에서 빠졌다.
+  C3·C4 fixture 커밋(`3c5a284`, `b6b8c20`)도 이 클론과 origin에 없다.
+- Next: 공개 전환(GitHub 설정)·push는 사람 몫.
+
 ## 2026-08-17 claude (15) — Spec v0.2 rev 2: L3 협업 계층으로 재선언, 패킷 원장 규약 시작
 
 - Human decisions recorded:
